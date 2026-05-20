@@ -31,6 +31,7 @@ class EmailListFactory extends Factory
             'default_reply_to_email' => fake()->optional()->safeEmail(),
             'requires_confirmation' => fake()->boolean(),
             'redirect_after_subscribed' => fake()->optional()->url(),
+            'redirect_after_unsubscribed' => fake()->optional()->url(),
             'campaign_mails_per_minute' => fake()->optional()->numberBetween(10, 120),
         ];
     }

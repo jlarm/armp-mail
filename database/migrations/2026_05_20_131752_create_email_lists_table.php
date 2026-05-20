@@ -19,9 +19,10 @@ return new class extends Migration
             $table->string('default_from_email');
             $table->string('default_from_name');
             $table->string('default_reply_to_email')->nullable();
-            $table->string('requires_confirmation')->default(false);
+            $table->boolean('requires_confirmation')->default(false);
             $table->string('redirect_after_subscribed')->nullable();
-            $table->string('campaign_mails_per_minute')->nullable();
+            $table->string('redirect_after_unsubscribed')->nullable();
+            $table->unsignedInteger('campaign_mails_per_minute')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
