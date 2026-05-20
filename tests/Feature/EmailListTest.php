@@ -2,6 +2,7 @@
 
 use App\Models\CustomField;
 use App\Models\EmailList;
+use App\Models\Segment;
 
 test('the factory creates a persistable email list', function () {
     $list = EmailList::factory()->create();
@@ -39,4 +40,13 @@ test('it has many custom fields', function () {
     expect($list->customFields)->toHaveCount(3)
         ->and($list->customFields->pluck('id')->all())
         ->toEqualCanonicalizing($fields->pluck('id')->all());
+});
+
+test('it has many segments', function () {
+    $list = EmailList::factory()->create();
+    $segments = Segment::factory()->count(3)->create(['email_list_id' => $list->id]);
+
+    expect($list->segments)->toHaveCount(3)
+        ->and($list->segments->pluck('id')->all())
+        ->toEqualCanonicalizing($segments->pluck('id')->all());
 });

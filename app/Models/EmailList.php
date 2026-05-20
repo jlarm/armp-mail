@@ -60,6 +60,14 @@ class EmailList extends Model
     }
 
     /**
+     * @return HasMany<Segment, $this>
+     */
+    public function segments(): HasMany
+    {
+        return $this->hasMany(Segment::class);
+    }
+
+    /**
      * @return BelongsToMany<Subscriber, $this, EmailListSubscriber, 'pivot'>
      */
     public function subscribers(): BelongsToMany
