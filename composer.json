@@ -72,6 +72,10 @@
             "npm run types:check",
             "@test"
         ],
+        "clean": [
+            "rector",
+            "pint --parallel"
+        ],
         "test": [
             "@php artisan config:clear --ansi",
             "@test:lint",
