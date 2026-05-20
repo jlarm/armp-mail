@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\CustomField;
 use App\Models\EmailList;
 
 test('the factory creates a persistable email list', function () {
@@ -29,4 +30,13 @@ test('the list is soft deleted', function () {
     $list->delete();
 
     $this->assertSoftDeleted($list);
+});
+
+test('it has many custom fields', function () {
+    $list = EmailList::factory()->create();
+    $fields = CustomField::factory()->count(3)->create(['email_list_id' => $list->id]);
+
+    expect($list->customFields)->toHaveCount(3)
+        ->and($list->customFields->pluck('id')->all())
+        ->toEqualCanonicalizing($fields->pluck('id')->all());
 });
