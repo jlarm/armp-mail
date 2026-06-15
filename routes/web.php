@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ListsController;
 use App\Http\Controllers\ListSubscriberController;
+use App\Http\Controllers\ListTagController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -14,6 +15,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('lists/{list:slug}', [ListsController::class, 'show'])->name('lists.show');
     Route::get('lists/{list:slug}/edit', [ListsController::class, 'edit'])->name('lists.edit');
     Route::put('lists/{list:slug}', [ListsController::class, 'update'])->name('lists.update');
+
+    Route::get('lists/{list:slug}/tags', [ListTagController::class, 'index'])->name('lists.tags.index');
+    Route::delete('lists/{list:slug}/tags', [ListTagController::class, 'destroy'])->name('lists.tags.destroy');
     Route::post('lists/{list:slug}/subscribers', [ListSubscriberController::class, 'store'])->name('lists.subscribers.store');
     Route::post('lists/{list:slug}/subscribers/import', [ListSubscriberController::class, 'import'])->name('lists.subscribers.import');
 

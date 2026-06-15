@@ -10,6 +10,7 @@ import {
     Reply,
     Search,
     Settings,
+    Tag,
     Upload,
     Users,
 } from 'lucide-vue-next';
@@ -45,6 +46,7 @@ import {
     importMethod as importSubscribersRoute,
     store as storeSubscriberRoute,
 } from '@/routes/lists/subscribers';
+import { index as tagsRoute } from '@/routes/lists/tags';
 
 type ListDetail = {
     id: number;
@@ -215,6 +217,16 @@ const importOpen = ref(false);
                     <MailCheck class="size-3.5" />
                     Double opt-in
                 </span>
+                <Button
+                    as-child
+                    variant="outline"
+                    class="h-10 border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] font-semibold text-[hsl(var(--ds-ink))] hover:bg-[hsl(var(--ds-accent)/0.08)]"
+                >
+                    <Link :href="tagsRoute(list.slug)">
+                        <Tag class="size-4" />
+                        Tags
+                    </Link>
+                </Button>
                 <Button
                     as-child
                     variant="outline"

@@ -465,6 +465,74 @@ test('a subscriber can be unsubscribed from a list', function () {
     expect($pivot->unsubscribed_at)->not->toBeNull();
 });
 
+test('the tags page lists tags with subscriber counts', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $list->subscribers()->attach(
+        Subscriber::factory()->create(['extra_attributes' => ['tags' => ['VIP', 'Sales']]]),
+    );
+    $list->subscribers()->attach(
+        Subscriber::factory()->create(['extra_attributes' => ['tags' => ['VIP']]]),
+    );
+    $list->subscribers()->attach(
+        Subscriber::factory()->create(['extra_attributes' => null]),
+    );
+
+    $this->get(route('lists.tags.index', $list))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('Lists/Tags/Index')
+                ->has('tags.data', 2)
+                ->where('tags.data.0.name', 'VIP')
+                ->where('tags.data.0.subscribers_count', 2)
+                ->where('tags.data.1.name', 'Sales')
+                ->where('tags.data.1.subscribers_count', 1)
+        );
+});
+
+test('the tags page can search tags', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $list->subscribers()->attach(
+        Subscriber::factory()->create(['extra_attributes' => ['tags' => ['VIP', 'Sales']]]),
+    );
+
+    $this->get(route('lists.tags.index', [$list, 'search' => 'sal']))
+        ->assertInertia(
+            fn ($page) => $page
+                ->has('tags.data', 1)
+                ->where('tags.data.0.name', 'Sales')
+        );
+});
+
+test('deleting a tag removes it from all subscribers on the list', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $a = Subscriber::factory()->create(['extra_attributes' => ['tags' => ['VIP', 'Sales'], 'role' => 'Owner']]);
+    $b = Subscriber::factory()->create(['extra_attributes' => ['tags' => ['VIP']]]);
+    $list->subscribers()->attach($a);
+    $list->subscribers()->attach($b);
+
+    $this->delete(route('lists.tags.destroy', $list), ['tag' => 'VIP'])
+        ->assertRedirect(route('lists.tags.index', $list));
+
+    expect($a->fresh()->extra_attributes)->toBe(['tags' => ['Sales'], 'role' => 'Owner']);
+    expect($b->fresh()->extra_attributes)->toBeNull();
+});
+
+test('deleting a tag requires a tag name', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+
+    $this->delete(route('lists.tags.destroy', $list), [])
+        ->assertSessionHasErrors('tag');
+});
+
 test('a subscriber can be deleted', function () {
     $this->actingAs(User::factory()->create());
 
