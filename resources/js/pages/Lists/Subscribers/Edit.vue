@@ -144,7 +144,7 @@ const placeholderSyntax = '{{ subscriber.<key> }}';
                     Subscriber
                 </p>
                 <h1
-                    class="font-display mt-1 truncate text-4xl leading-[1] tracking-tight text-[hsl(var(--ds-ink))]"
+                    class="font-display mt-1 truncate py-0.5 text-4xl leading-[1.15] tracking-tight text-[hsl(var(--ds-ink))]"
                 >
                     {{ subscriber.email }}
                 </h1>

@@ -169,7 +169,7 @@ const importOpen = ref(false);
                         Mailing list
                     </p>
                     <h1
-                        class="font-display mt-1 text-4xl leading-[1] tracking-tight text-[hsl(var(--ds-ink))] md:text-5xl"
+                        class="font-display mt-1 text-4xl leading-[1.05] tracking-tight text-[hsl(var(--ds-ink))] md:text-5xl"
                     >
                         {{ list.name }}
                     </h1>

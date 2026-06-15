@@ -27,7 +27,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                 Account
             </p>
             <h1
-                class="font-display mt-2 text-5xl leading-[0.95] tracking-tight text-[hsl(var(--ds-ink))] md:text-6xl"
+                class="font-display mt-2 text-5xl leading-[1.02] tracking-tight text-[hsl(var(--ds-ink))] md:text-6xl"
             >
                 Settings
             </h1>
