@@ -68,8 +68,55 @@ test('authenticated users can view a list show page', function () {
                 ->component('Lists/Show')
                 ->where('list.name', $list->name)
                 ->where('list.subscribers_count', 2)
-                ->has('subscribers', 2)
+                ->has('subscribers.data', 2)
+                ->where('subscribers.total', 2)
         );
+});
+
+test('the show page paginates subscribers', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $list->subscribers()->attach(Subscriber::factory()->count(30)->create());
+
+    $this->get(route('lists.show', $list))
+        ->assertInertia(
+            fn ($page) => $page
+                ->has('subscribers.data', 25)
+                ->where('subscribers.total', 30)
+                ->where('subscribers.last_page', 2)
+        );
+
+    $this->get(route('lists.show', [$list, 'page' => 2]))
+        ->assertInertia(
+            fn ($page) => $page
+                ->has('subscribers.data', 5)
+                ->where('subscribers.current_page', 2)
+        );
+});
+
+test('the show page can search subscribers', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $needle = Subscriber::factory()->create([
+        'email' => 'findme@example.com',
+        'first_name' => 'Unique',
+        'last_name' => 'Person',
+    ]);
+    $list->subscribers()->attach($needle);
+    $list->subscribers()->attach(Subscriber::factory()->count(5)->create());
+
+    $this->get(route('lists.show', [$list, 'search' => 'findme']))
+        ->assertInertia(
+            fn ($page) => $page
+                ->where('filters.search', 'findme')
+                ->has('subscribers.data', 1)
+                ->where('subscribers.data.0.email', 'findme@example.com')
+        );
+
+    $this->get(route('lists.show', [$list, 'search' => 'Unique']))
+        ->assertInertia(fn ($page) => $page->has('subscribers.data', 1));
 });
 
 test('creating a list generates a unique slug when names collide', function () {

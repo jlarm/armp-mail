@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { Form, Head, Link } from '@inertiajs/vue3';
+import { Form, Head, Link, router } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     AtSign,
+    ChevronLeft,
+    ChevronRight,
     MailCheck,
     Plus,
     Reply,
+    Search,
     Upload,
     Users,
 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { index as listsRoute } from '@/routes/lists';
+import { index as listsRoute, show as showRoute } from '@/routes/lists';
 import {
     importMethod as importSubscribersRoute,
     store as storeSubscriberRoute,
@@ -51,9 +54,21 @@ type SubscriberRow = {
     subscribed_at: string | null;
 };
 
-defineProps<{
+type Paginated<T> = {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    from: number | null;
+    to: number | null;
+    total: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
+};
+
+const props = defineProps<{
     list: ListDetail;
-    subscribers: SubscriberRow[];
+    subscribers: Paginated<SubscriberRow>;
+    filters: { search: string };
 }>();
 
 defineOptions({
@@ -65,6 +80,27 @@ defineOptions({
             },
         ],
     },
+});
+
+const search = ref(props.filters.search);
+
+let searchTimeout: ReturnType<typeof setTimeout> | undefined;
+
+watch(search, (value) => {
+    clearTimeout(searchTimeout);
+
+    searchTimeout = setTimeout(() => {
+        router.get(
+            showRoute(props.list.slug).url,
+            value ? { search: value } : {},
+            {
+                only: ['subscribers', 'filters'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    }, 300);
 });
 
 const numberFormatter = new Intl.NumberFormat();
@@ -205,14 +241,20 @@ const importOpen = ref(false);
             <div class="mb-4 flex items-end justify-between gap-4">
                 <div>
                     <h2 class="font-display text-2xl text-[hsl(var(--ds-ink))]">
-                        Recent subscribers
+                        Subscribers
                     </h2>
-                    <span
-                        v-if="list.subscribers_count > subscribers.length"
-                        class="text-xs text-[hsl(var(--ds-ink-faint))]"
-                    >
-                        Showing {{ subscribers.length }} of
-                        {{ formatCount(list.subscribers_count) }}
+                    <span class="text-xs text-[hsl(var(--ds-ink-faint))]">
+                        <template v-if="filters.search">
+                            {{ formatCount(subscribers.total) }}
+                            {{ subscribers.total === 1 ? 'match' : 'matches' }}
+                            for “{{ filters.search }}”
+                        </template>
+                        <template v-else-if="subscribers.from">
+                            Showing {{ formatCount(subscribers.from) }}–{{
+                                formatCount(subscribers.to ?? 0)
+                            }}
+                            of {{ formatCount(subscribers.total) }}
+                        </template>
                     </span>
                 </div>
 
@@ -417,11 +459,29 @@ const importOpen = ref(false);
                 </div>
             </div>
 
+            <!-- Search -->
+            <div class="relative mb-4">
+                <Search
+                    class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[hsl(var(--ds-ink-faint))]"
+                />
+                <Input
+                    v-model="search"
+                    type="search"
+                    class="h-11 border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] pl-9"
+                    placeholder="Search by name or email…"
+                    aria-label="Search subscribers"
+                />
+            </div>
+
             <div
-                v-if="!subscribers.length"
+                v-if="!subscribers.data.length"
                 class="rounded-2xl border border-dashed border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel)/0.5)] px-6 py-12 text-center text-sm text-[hsl(var(--ds-ink-soft))]"
             >
-                No subscribers on this list yet.
+                {{
+                    filters.search
+                        ? `No subscribers match “${filters.search}”.`
+                        : 'No subscribers on this list yet.'
+                }}
             </div>
 
             <ul
@@ -429,7 +489,7 @@ const importOpen = ref(false);
                 class="divide-y divide-[hsl(var(--ds-line))] overflow-hidden rounded-2xl border border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))]"
             >
                 <li
-                    v-for="subscriber in subscribers"
+                    v-for="subscriber in subscribers.data"
                     :key="subscriber.id"
                     class="flex items-center gap-4 px-5 py-3.5"
                 >
@@ -464,6 +524,62 @@ const importOpen = ref(false);
                     </span>
                 </li>
             </ul>
+
+            <!-- Pagination -->
+            <nav
+                v-if="subscribers.last_page > 1"
+                class="mt-4 flex items-center justify-between gap-4"
+                aria-label="Pagination"
+            >
+                <p class="text-xs text-[hsl(var(--ds-ink-faint))]">
+                    Page {{ subscribers.current_page }} of
+                    {{ subscribers.last_page }}
+                </p>
+                <div class="flex items-center gap-2">
+                    <Button
+                        as-child
+                        variant="outline"
+                        :disabled="!subscribers.prev_page_url"
+                        class="h-9 border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] text-[hsl(var(--ds-ink))] hover:bg-[hsl(var(--ds-accent)/0.08)]"
+                    >
+                        <Link
+                            v-if="subscribers.prev_page_url"
+                            :href="subscribers.prev_page_url"
+                            preserve-scroll
+                            preserve-state
+                            :only="['subscribers', 'filters']"
+                        >
+                            <ChevronLeft class="size-4" />
+                            Previous
+                        </Link>
+                        <span v-else>
+                            <ChevronLeft class="size-4" />
+                            Previous
+                        </span>
+                    </Button>
+                    <Button
+                        as-child
+                        variant="outline"
+                        :disabled="!subscribers.next_page_url"
+                        class="h-9 border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] text-[hsl(var(--ds-ink))] hover:bg-[hsl(var(--ds-accent)/0.08)]"
+                    >
+                        <Link
+                            v-if="subscribers.next_page_url"
+                            :href="subscribers.next_page_url"
+                            preserve-scroll
+                            preserve-state
+                            :only="['subscribers', 'filters']"
+                        >
+                            Next
+                            <ChevronRight class="size-4" />
+                        </Link>
+                        <span v-else>
+                            Next
+                            <ChevronRight class="size-4" />
+                        </span>
+                    </Button>
+                </div>
+            </nav>
         </section>
     </div>
 </template>

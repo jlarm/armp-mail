@@ -8,6 +8,7 @@ use App\Http\Requests\StoreEmailListRequest;
 use App\Models\EmailList;
 use App\Models\Subscriber;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -43,9 +44,30 @@ class ListsController extends Controller
     /**
      * Display a single email list and its subscribers.
      */
-    public function show(EmailList $list): Response
+    public function show(Request $request, EmailList $list): Response
     {
         $list->loadCount('subscribers');
+
+        $search = trim((string) $request->string('search'));
+
+        $subscribers = $list->subscribers()
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query->where('email', 'like', "%{$search}%")
+                        ->orWhere('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%");
+                });
+            })
+            ->latest('email_list_subscribers.created_at')
+            ->paginate(25)
+            ->withQueryString()
+            ->through(fn (Subscriber $subscriber): array => [
+                'id' => $subscriber->id,
+                'email' => $subscriber->email,
+                'name' => trim("{$subscriber->first_name} {$subscriber->last_name}") ?: null,
+                'status' => $subscriber->pivot->status->value,
+                'subscribed_at' => $subscriber->pivot->subscribed_at?->toIso8601String(),
+            ]);
 
         return Inertia::render('Lists/Show', [
             'list' => [
@@ -60,17 +82,8 @@ class ListsController extends Controller
                 'subscribers_count' => $list->subscribers_count,
                 'created_at' => $list->created_at?->toIso8601String(),
             ],
-            'subscribers' => $list->subscribers()
-                ->latest('email_list_subscribers.created_at')
-                ->take(25)
-                ->get()
-                ->map(fn (Subscriber $subscriber): array => [
-                    'id' => $subscriber->id,
-                    'email' => $subscriber->email,
-                    'name' => trim("{$subscriber->first_name} {$subscriber->last_name}") ?: null,
-                    'status' => $subscriber->pivot->status->value,
-                    'subscribed_at' => $subscriber->pivot->subscribed_at?->toIso8601String(),
-                ]),
+            'subscribers' => $subscribers,
+            'filters' => ['search' => $search],
         ]);
     }
 
