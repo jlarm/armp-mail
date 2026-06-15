@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\CampaignTrackingController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ListsController;
 use App\Http\Controllers\ListSegmentController;
 use App\Http\Controllers\ListSubscriberController;
@@ -16,7 +17,7 @@ Route::get('e/o/{send:uuid}', [CampaignTrackingController::class, 'open'])->name
 Route::get('e/c/{send:uuid}', [CampaignTrackingController::class, 'click'])->name('campaigns.track.click');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::resource('campaigns', CampaignController::class)->except(['show']);
 
