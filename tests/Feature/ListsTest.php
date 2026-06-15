@@ -1,7 +1,10 @@
 <?php
 
 use App\Enums\Status;
+use App\Models\Campaign;
 use App\Models\EmailList;
+use App\Models\Segment;
+use App\Models\Send;
 use App\Models\Subscriber;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -531,6 +534,290 @@ test('deleting a tag requires a tag name', function () {
 
     $this->delete(route('lists.tags.destroy', $list), [])
         ->assertSessionHasErrors('tag');
+});
+
+test('the segments page lists segments with population counts', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    Segment::factory()->for($list)->create([
+        'name' => 'Owners',
+        'rules' => ['match' => 'all', 'conditions' => [
+            ['type' => 'tags', 'comparison' => 'any', 'value' => ['Owner']],
+        ]],
+    ]);
+
+    $list->subscribers()->attach(Subscriber::factory()->create(['extra_attributes' => ['tags' => ['Owner']]]));
+    $list->subscribers()->attach(Subscriber::factory()->create(['extra_attributes' => ['tags' => ['Owner', 'VIP']]]));
+    $list->subscribers()->attach(Subscriber::factory()->create(['extra_attributes' => ['tags' => ['Other']]]));
+
+    $this->get(route('lists.segments.index', $list))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('Lists/Segments/Index')
+                ->has('segments', 1)
+                ->where('segments.0.name', 'Owners')
+                ->where('segments.0.population', 2)
+        );
+});
+
+test('the segment builder exposes condition option sources', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $list->subscribers()->attach(Subscriber::factory()->create([
+        'extra_attributes' => ['tags' => ['VIP'], 'role' => 'Owner'],
+    ]));
+    EmailList::factory()->create();
+
+    $this->get(route('lists.segments.create', $list))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('Lists/Segments/Create')
+                ->where('options.tags', ['VIP'])
+                ->where('options.attributes', ['role'])
+                ->has('options.lists', 1)
+                ->has('options.campaigns')
+                ->has('options.automationMails')
+        );
+});
+
+test('a multi-condition AND segment counts subscribers matching all conditions', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    Segment::factory()->for($list)->create([
+        'name' => 'VIP gmail',
+        'rules' => ['match' => 'all', 'conditions' => [
+            ['type' => 'tags', 'comparison' => 'all', 'value' => ['VIP']],
+            ['type' => 'email', 'comparison' => 'ends_with', 'value' => '@gmail.com'],
+        ]],
+    ]);
+
+    $list->subscribers()->attach(Subscriber::factory()->create(['email' => 'a@gmail.com', 'extra_attributes' => ['tags' => ['VIP']]]));
+    $list->subscribers()->attach(Subscriber::factory()->create(['email' => 'b@yahoo.com', 'extra_attributes' => ['tags' => ['VIP']]]));
+    $list->subscribers()->attach(Subscriber::factory()->create(['email' => 'c@gmail.com', 'extra_attributes' => ['tags' => ['Other']]]));
+
+    $this->get(route('lists.segments.index', $list))
+        ->assertInertia(fn ($page) => $page->where('segments.0.population', 1));
+});
+
+test('an opened-campaign condition counts subscribers with an open', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $campaign = Campaign::factory()->create(['email_list_id' => $list->id]);
+
+    $opened = Subscriber::factory()->create();
+    $notOpened = Subscriber::factory()->create();
+    $list->subscribers()->attach([$opened->id, $notOpened->id]);
+
+    Send::factory()->create([
+        'sendable_type' => Campaign::class,
+        'sendable_id' => $campaign->id,
+        'subscriber_id' => $opened->id,
+        'sent_at' => now(),
+        'opened_at' => now(),
+    ]);
+    Send::factory()->create([
+        'sendable_type' => Campaign::class,
+        'sendable_id' => $campaign->id,
+        'subscriber_id' => $notOpened->id,
+        'sent_at' => now(),
+        'opened_at' => null,
+    ]);
+
+    Segment::factory()->for($list)->create([
+        'name' => 'Openers',
+        'rules' => ['match' => 'all', 'conditions' => [
+            ['type' => 'opened_campaign', 'value' => $campaign->id],
+        ]],
+    ]);
+
+    $this->get(route('lists.segments.index', $list))
+        ->assertInertia(fn ($page) => $page->where('segments.0.population', 1));
+});
+
+test('a segment can be created from conditions', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+
+    $this->post(route('lists.segments.store', $list), [
+        'name' => 'Engaged',
+        'match' => 'any',
+        'conditions' => [
+            ['type' => 'tags', 'comparison' => 'any', 'value' => ['Opened']],
+            ['type' => 'email', 'comparison' => 'contains', 'value' => 'auto'],
+        ],
+    ])->assertRedirect(route('lists.segments.index', $list));
+
+    $segment = $list->segments()->sole();
+    expect($segment->name)->toBe('Engaged');
+    expect($segment->rules['match'])->toBe('any');
+    expect($segment->rules['conditions'])->toHaveCount(2);
+});
+
+test('creating a segment requires a name, match, and conditions', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+
+    $this->post(route('lists.segments.store', $list), [
+        'match' => 'sometimes',
+        'conditions' => [],
+    ])->assertSessionHasErrors(['name', 'match', 'conditions']);
+});
+
+test('a tags condition requires at least one tag', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+
+    $this->post(route('lists.segments.store', $list), [
+        'name' => 'Broken',
+        'match' => 'all',
+        'conditions' => [
+            ['type' => 'tags', 'comparison' => 'any', 'value' => []],
+        ],
+    ])->assertSessionHasErrors('conditions.0.value');
+});
+
+test('segment names are unique within a list', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    Segment::factory()->for($list)->create(['name' => 'Owners']);
+
+    $this->post(route('lists.segments.store', $list), [
+        'name' => 'Owners',
+        'match' => 'any',
+        'conditions' => [['type' => 'tags', 'comparison' => 'any', 'value' => ['Owner']]],
+    ])->assertSessionHasErrors('name');
+});
+
+test('the segment edit page loads existing rules', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $segment = Segment::factory()->for($list)->create([
+        'name' => 'Owners',
+        'rules' => ['match' => 'any', 'conditions' => [
+            ['type' => 'tags', 'comparison' => 'all', 'value' => ['Owner']],
+        ]],
+    ]);
+
+    $this->get(route('lists.segments.edit', [$list, $segment]))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('Lists/Segments/Edit')
+                ->where('segment.name', 'Owners')
+                ->where('segment.match', 'any')
+                ->has('segment.conditions', 1)
+                ->has('options.tags')
+        );
+});
+
+test('a segment can be updated', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $segment = Segment::factory()->for($list)->create(['name' => 'Old']);
+
+    $this->put(route('lists.segments.update', [$list, $segment]), [
+        'name' => 'New name',
+        'match' => 'all',
+        'conditions' => [
+            ['type' => 'email', 'comparison' => 'contains', 'value' => '@acme.com'],
+        ],
+    ])->assertRedirect(route('lists.segments.index', $list));
+
+    $segment->refresh();
+    expect($segment->name)->toBe('New name');
+    expect($segment->rules['conditions'][0]['type'])->toBe('email');
+});
+
+test('a segment keeps its own name on update', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $segment = Segment::factory()->for($list)->create(['name' => 'Keep']);
+
+    $this->put(route('lists.segments.update', [$list, $segment]), [
+        'name' => 'Keep',
+        'match' => 'all',
+        'conditions' => [['type' => 'tags', 'comparison' => 'any', 'value' => ['VIP']]],
+    ])->assertSessionHasNoErrors();
+});
+
+test('a segment from another list cannot be edited via this list', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $segment = Segment::factory()->create();
+
+    $this->get(route('lists.segments.edit', [$list, $segment]))->assertNotFound();
+});
+
+test('the segment evaluator previews matching subscribers', function () {
+    $list = EmailList::factory()->create();
+    $list->subscribers()->attach(Subscriber::factory()->create([
+        'email' => 'a@gmail.com',
+        'extra_attributes' => ['tags' => ['VIP']],
+    ]));
+    $list->subscribers()->attach(Subscriber::factory()->create([
+        'email' => 'b@yahoo.com',
+        'extra_attributes' => ['tags' => ['VIP']],
+    ]));
+
+    $result = app(App\Actions\EvaluateSegments::class)->preview($list, [
+        'match' => 'all',
+        'conditions' => [
+            ['type' => 'tags', 'comparison' => 'all', 'value' => ['VIP']],
+            ['type' => 'email', 'comparison' => 'ends_with', 'value' => '@gmail.com'],
+        ],
+    ]);
+
+    expect($result['total'])->toBe(1);
+    expect($result['subscribers'])->toHaveCount(1);
+    expect($result['subscribers'][0]['email'])->toBe('a@gmail.com');
+});
+
+test('the segment preview is empty without conditions', function () {
+    $list = EmailList::factory()->create();
+
+    $result = app(App\Actions\EvaluateSegments::class)->preview($list, [
+        'match' => 'all',
+        'conditions' => [],
+    ]);
+
+    expect($result['total'])->toBe(0);
+    expect($result['subscribers'])->toBe([]);
+});
+
+test('a segment can be deleted', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $segment = Segment::factory()->for($list)->create();
+
+    $this->delete(route('lists.segments.destroy', [$list, $segment]))
+        ->assertRedirect(route('lists.segments.index', $list));
+
+    $this->assertDatabaseMissing('segments', ['id' => $segment->id]);
+});
+
+test('a segment from another list cannot be deleted via this list', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $segment = Segment::factory()->create();
+
+    $this->delete(route('lists.segments.destroy', [$list, $segment]))
+        ->assertNotFound();
 });
 
 test('a subscriber can be deleted', function () {

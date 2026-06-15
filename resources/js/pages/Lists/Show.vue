@@ -5,6 +5,7 @@ import {
     AtSign,
     ChevronLeft,
     ChevronRight,
+    Layers,
     MailCheck,
     Plus,
     Reply,
@@ -41,6 +42,7 @@ import {
     index as listsRoute,
     show as showRoute,
 } from '@/routes/lists';
+import { index as segmentsRoute } from '@/routes/lists/segments';
 import {
     edit as editSubscriberRoute,
     importMethod as importSubscribersRoute,
@@ -225,6 +227,16 @@ const importOpen = ref(false);
                     <Link :href="tagsRoute(list.slug)">
                         <Tag class="size-4" />
                         Tags
+                    </Link>
+                </Button>
+                <Button
+                    as-child
+                    variant="outline"
+                    class="h-10 border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] font-semibold text-[hsl(var(--ds-ink))] hover:bg-[hsl(var(--ds-accent)/0.08)]"
+                >
+                    <Link :href="segmentsRoute(list.slug)">
+                        <Layers class="size-4" />
+                        Segments
                     </Link>
                 </Button>
                 <Button

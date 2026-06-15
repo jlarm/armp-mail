@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ListsController;
+use App\Http\Controllers\ListSegmentController;
 use App\Http\Controllers\ListSubscriberController;
 use App\Http\Controllers\ListTagController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('lists/{list:slug}/tags', [ListTagController::class, 'index'])->name('lists.tags.index');
     Route::delete('lists/{list:slug}/tags', [ListTagController::class, 'destroy'])->name('lists.tags.destroy');
+
+    Route::get('lists/{list:slug}/segments', [ListSegmentController::class, 'index'])->name('lists.segments.index');
+    Route::get('lists/{list:slug}/segments/create', [ListSegmentController::class, 'create'])->name('lists.segments.create');
+    Route::post('lists/{list:slug}/segments', [ListSegmentController::class, 'store'])->name('lists.segments.store');
+    Route::scopeBindings()->group(function (): void {
+        Route::get('lists/{list:slug}/segments/{segment}/edit', [ListSegmentController::class, 'edit'])->name('lists.segments.edit');
+        Route::put('lists/{list:slug}/segments/{segment}', [ListSegmentController::class, 'update'])->name('lists.segments.update');
+        Route::delete('lists/{list:slug}/segments/{segment}', [ListSegmentController::class, 'destroy'])->name('lists.segments.destroy');
+    });
     Route::post('lists/{list:slug}/subscribers', [ListSubscriberController::class, 'store'])->name('lists.subscribers.store');
     Route::post('lists/{list:slug}/subscribers/import', [ListSubscriberController::class, 'import'])->name('lists.subscribers.import');
 
