@@ -36,6 +36,10 @@
 
         @fonts
 
+        {{-- Display serif for the "Dispatch Desk" editorial masthead --}}
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=instrument-serif:400,400i" rel="stylesheet">
+
         @vite(['resources/css/app.css', 'resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
         <x-inertia::head>
             <title>{{ config('app.name', 'Laravel') }}</title>

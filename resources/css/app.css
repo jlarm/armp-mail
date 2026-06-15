@@ -170,3 +170,61 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* ==========================================================================
+   "Dispatch Desk" — editorial mail-room theme tokens
+   Scoped, additive palette used by the app shell + settings surfaces.
+   Triplets (H S% L%) so they compose with alpha: hsl(var(--ds-accent) / .12)
+   ========================================================================== */
+:root {
+    --ds-paper: 40 36% 96.5%;
+    --ds-panel: 42 50% 99%;
+    --ds-rail: 38 32% 94.5%;
+    --ds-ink: 24 16% 13%;
+    --ds-ink-soft: 26 9% 38%;
+    --ds-ink-faint: 30 7% 55%;
+    --ds-line: 35 22% 86%;
+    --ds-line-soft: 38 30% 91%;
+    --ds-accent: 9 76% 50%;
+    --ds-accent-ink: 9 72% 42%;
+    --ds-gold: 38 64% 48%;
+}
+
+.dark {
+    --ds-paper: 27 12% 7.5%;
+    --ds-panel: 28 11% 10.5%;
+    --ds-rail: 27 13% 6%;
+    --ds-ink: 40 30% 92%;
+    --ds-ink-soft: 36 11% 64%;
+    --ds-ink-faint: 33 9% 47%;
+    --ds-line: 30 9% 17%;
+    --ds-line-soft: 30 8% 14%;
+    --ds-accent: 11 84% 59%;
+    --ds-accent-ink: 11 88% 66%;
+    --ds-gold: 40 70% 60%;
+}
+
+@layer utilities {
+    .font-display {
+        font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+        font-feature-settings:
+            'liga' 1,
+            'dlig' 1;
+    }
+
+    /* Fine paper-grain texture for atmosphere on large surfaces. */
+    .ds-grain::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.5;
+        mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+    }
+    .dark .ds-grain::before {
+        mix-blend-mode: screen;
+        opacity: 0.6;
+    }
+}
