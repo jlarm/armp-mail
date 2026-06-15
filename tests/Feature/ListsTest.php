@@ -119,6 +119,48 @@ test('the show page can search subscribers', function () {
         ->assertInertia(fn ($page) => $page->has('subscribers.data', 1));
 });
 
+test('the show page can filter subscribers by status', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $list->subscribers()->attach(
+        Subscriber::factory()->create()->id,
+        ['status' => Status::SUBSCRIBED->value],
+    );
+    Subscriber::factory()->count(2)->create()->each(
+        fn ($subscriber) => $list->subscribers()->attach(
+            $subscriber->id,
+            ['status' => Status::UNSUBSCRIBED->value],
+        ),
+    );
+
+    $this->get(route('lists.show', [$list, 'status' => 'unsubscribed']))
+        ->assertInertia(
+            fn ($page) => $page
+                ->where('filters.status', 'unsubscribed')
+                ->has('subscribers.data', 2)
+                ->where('subscribers.total', 2)
+                ->has('statuses')
+        );
+
+    $this->get(route('lists.show', [$list, 'status' => 'subscribed']))
+        ->assertInertia(fn ($page) => $page->has('subscribers.data', 1));
+});
+
+test('an invalid status filter is ignored', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $list->subscribers()->attach(Subscriber::factory()->count(3)->create());
+
+    $this->get(route('lists.show', [$list, 'status' => 'bogus']))
+        ->assertInertia(
+            fn ($page) => $page
+                ->where('filters.status', null)
+                ->has('subscribers.data', 3)
+        );
+});
+
 test('creating a list generates a unique slug when names collide', function () {
     $this->actingAs(User::factory()->create());
 

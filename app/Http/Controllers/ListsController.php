@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\Status;
 use App\Http\Requests\StoreEmailListRequest;
 use App\Http\Requests\UpdateEmailListRequest;
 use App\Models\EmailList;
@@ -51,6 +52,8 @@ class ListsController extends Controller
 
         $search = trim((string) $request->string('search'));
 
+        $status = Status::tryFrom((string) $request->string('status'));
+
         $subscribers = $list->subscribers()
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
@@ -59,6 +62,7 @@ class ListsController extends Controller
                         ->orWhere('last_name', 'like', "%{$search}%");
                 });
             })
+            ->when($status !== null, fn ($query) => $query->where('email_list_subscribers.status', $status->value))
             ->latest('email_list_subscribers.created_at')
             ->paginate(25)
             ->withQueryString()
@@ -84,7 +88,14 @@ class ListsController extends Controller
                 'created_at' => $list->created_at?->toIso8601String(),
             ],
             'subscribers' => $subscribers,
-            'filters' => ['search' => $search],
+            'filters' => [
+                'search' => $search,
+                'status' => $status?->value,
+            ],
+            'statuses' => collect(Status::cases())->map(fn (Status $case): array => [
+                'value' => $case->value,
+                'label' => $case->label(),
+            ]),
         ]);
     }
 

@@ -29,6 +29,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     edit as editListRoute,
     index as listsRoute,
     show as showRoute,
@@ -74,7 +81,8 @@ type Paginated<T> = {
 const props = defineProps<{
     list: ListDetail;
     subscribers: Paginated<SubscriberRow>;
-    filters: { search: string };
+    filters: { search: string; status: string | null };
+    statuses: { value: string; label: string }[];
 }>();
 
 defineOptions({
@@ -89,25 +97,35 @@ defineOptions({
 });
 
 const search = ref(props.filters.search);
+const status = ref(props.filters.status ?? 'all');
+
+const applyFilters = () => {
+    const params: Record<string, string> = {};
+
+    if (search.value) {
+        params.search = search.value;
+    }
+
+    if (status.value !== 'all') {
+        params.status = status.value;
+    }
+
+    router.get(showRoute(props.list.slug).url, params, {
+        only: ['subscribers', 'filters'],
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+};
 
 let searchTimeout: ReturnType<typeof setTimeout> | undefined;
 
-watch(search, (value) => {
+watch(search, () => {
     clearTimeout(searchTimeout);
-
-    searchTimeout = setTimeout(() => {
-        router.get(
-            showRoute(props.list.slug).url,
-            value ? { search: value } : {},
-            {
-                only: ['subscribers', 'filters'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
-    }, 300);
+    searchTimeout = setTimeout(applyFilters, 300);
 });
+
+watch(status, applyFilters);
 
 const numberFormatter = new Intl.NumberFormat();
 const formatCount = (value: number) => numberFormatter.format(value);
@@ -479,18 +497,39 @@ const importOpen = ref(false);
                 </div>
             </div>
 
-            <!-- Search -->
-            <div class="relative mb-4">
-                <Search
-                    class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[hsl(var(--ds-ink-faint))]"
-                />
-                <Input
-                    v-model="search"
-                    type="search"
-                    class="h-11 border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] pl-9"
-                    placeholder="Search by name or email…"
-                    aria-label="Search subscribers"
-                />
+            <!-- Filters -->
+            <div class="mb-4 flex flex-col gap-2 sm:flex-row">
+                <div class="relative flex-1">
+                    <Search
+                        class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[hsl(var(--ds-ink-faint))]"
+                    />
+                    <Input
+                        v-model="search"
+                        type="search"
+                        class="h-11 border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] pl-9"
+                        placeholder="Search by name or email…"
+                        aria-label="Search subscribers"
+                    />
+                </div>
+
+                <Select v-model="status">
+                    <SelectTrigger
+                        class="!h-11 w-full border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] sm:w-48"
+                        aria-label="Filter by status"
+                    >
+                        <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem
+                            v-for="option in statuses"
+                            :key="option.value"
+                            :value="option.value"
+                        >
+                            {{ option.label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
 
             <div
@@ -498,8 +537,8 @@ const importOpen = ref(false);
                 class="rounded-2xl border border-dashed border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel)/0.5)] px-6 py-12 text-center text-sm text-[hsl(var(--ds-ink-soft))]"
             >
                 {{
-                    filters.search
-                        ? `No subscribers match “${filters.search}”.`
+                    filters.search || filters.status
+                        ? 'No subscribers match these filters.'
                         : 'No subscribers on this list yet.'
                 }}
             </div>
