@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\CampaignFrequency;
 use App\Enums\CampaignStatus;
 use Database\Factories\CampaignFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'email_list_id',
@@ -24,10 +26,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'content_json',
     'structured_html',
     'status',
+    'frequency',
     'track_opens',
     'track_clicks',
     'scheduled_at',
+    'next_run_at',
     'sent_at',
+    'last_sent_at',
 ])]
 class Campaign extends Model
 {
@@ -50,6 +55,7 @@ class Campaign extends Model
             'content_json' => 'json',
             'structured_html' => 'string',
             'status' => CampaignStatus::class,
+            'frequency' => CampaignFrequency::class,
             'track_opens' => 'boolean',
             'track_clicks' => 'boolean',
             'sent_to_count' => 'integer',
@@ -60,10 +66,20 @@ class Campaign extends Model
             'bounce_count' => 'integer',
             'unsubscribe_count' => 'integer',
             'scheduled_at' => 'datetime',
+            'next_run_at' => 'datetime',
             'sent_at' => 'datetime',
+            'last_sent_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return HasMany<CampaignDispatch, $this>
+     */
+    public function dispatches(): HasMany
+    {
+        return $this->hasMany(CampaignDispatch::class);
     }
 
     /**

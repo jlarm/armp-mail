@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Console\Commands;
+
+use App\Enums\CampaignStatus;
+use App\Enums\Status;
+use App\Models\Campaign;
+use App\Models\CampaignDispatch;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
+use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+
+#[Signature('campaigns:dispatch-due')]
+#[Description('Materialise a dispatch for every campaign whose next run is due.')]
+class DispatchDueCampaigns extends Command
+{
+    public function handle(): int
+    {
+        $due = Campaign::query()
+            ->whereNotNull('next_run_at')
+            ->where('next_run_at', '<=', now())
+            ->whereNotIn('status', [CampaignStatus::CANCELLED->value, CampaignStatus::PAUSED->value])
+            ->get();
+
+        foreach ($due as $campaign) {
+            $this->dispatchCampaign($campaign);
+        }
+
+        $this->info("Dispatched {$due->count()} campaign(s).");
+
+        return self::SUCCESS;
+    }
+
+    private function dispatchCampaign(Campaign $campaign): void
+    {
+        $recipients = $campaign->emailList
+            ?->subscribers()
+            ->wherePivot('status', Status::SUBSCRIBED->value)
+            ->count() ?? 0;
+
+        CampaignDispatch::create([
+            'campaign_id' => $campaign->id,
+            'status' => 'sent',
+            'scheduled_at' => $campaign->next_run_at,
+            'sent_at' => now(),
+            'sent_to_count' => $recipients,
+        ]);
+
+        $next = $campaign->frequency->nextRunAfter(Carbon::now());
+
+        $campaign->forceFill([
+            'last_sent_at' => now(),
+            'next_run_at' => $next,
+            'status' => $next === null ? CampaignStatus::SENT->value : CampaignStatus::SENDING->value,
+            'sent_at' => $campaign->sent_at ?? now(),
+        ])->save();
+    }
+}

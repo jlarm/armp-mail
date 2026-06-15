@@ -27,6 +27,7 @@ import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
 import { toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import { index as campaigns } from '@/routes/campaigns';
 import { index as lists } from '@/routes/lists';
 import { index as templates } from '@/routes/templates';
 import type { BreadcrumbItem, NavItem } from '@/types';
@@ -56,7 +57,7 @@ const sections: DeskSection[] = [
     {
         label: 'Dispatch',
         items: [
-            { title: 'Campaigns', href: dashboard(), icon: Send, soon: true },
+            { title: 'Campaigns', href: campaigns(), icon: Send },
             {
                 title: 'Automations',
                 href: dashboard(),

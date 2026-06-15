@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ListsController;
 use App\Http\Controllers\ListSegmentController;
 use App\Http\Controllers\ListSubscriberController;
@@ -11,6 +12,8 @@ Route::inertia('/', 'Welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+
+    Route::resource('campaigns', CampaignController::class)->except(['show']);
 
     Route::post('templates/images', [TemplateController::class, 'uploadImage'])->name('templates.images');
     Route::resource('templates', TemplateController::class)->except(['show']);
