@@ -116,7 +116,7 @@ class CampaignController extends Controller
                 'from_email' => $campaign->from_email,
                 'reply_to_email' => $campaign->reply_to_email,
                 'segment_id' => $campaign->segment_id,
-                'template' => $campaign->template?->name,
+                'template_id' => $campaign->template_id,
                 'list' => $campaign->emailList?->name,
                 'content' => $campaign->content_json ?? [],
                 'track_opens' => $campaign->track_opens,
@@ -144,6 +144,14 @@ class CampaignController extends Controller
                 fn (CampaignFrequency $frequency): array => ['value' => $frequency->value, 'label' => $frequency->label()],
                 CampaignFrequency::cases(),
             ),
+            'templates' => Template::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'html'])
+                ->map(fn (Template $template): array => [
+                    'value' => $template->id,
+                    'label' => $template->name,
+                    'html' => $template->html,
+                ]),
             'dispatches' => $campaign->dispatches()
                 ->latest('scheduled_at')
                 ->take(20)
@@ -178,6 +186,7 @@ class CampaignController extends Controller
             'from_email' => $data['from_email'] ?? null,
             'reply_to_email' => $data['reply_to_email'] ?? null,
             'segment_id' => $data['segment_id'] ?? null,
+            'template_id' => $data['template_id'] ?? null,
             'track_opens' => $data['track_opens'] ?? false,
             'track_clicks' => $data['track_clicks'] ?? false,
             'frequency' => $data['frequency'] ?? CampaignFrequency::ONCE->value,

@@ -43,7 +43,7 @@ type Campaign = {
     from_email: string | null;
     reply_to_email: string | null;
     segment_id: number | null;
-    template: string | null;
+    template_id: number | null;
     list: string | null;
     content: Block[];
     track_opens: boolean;
@@ -72,10 +72,13 @@ type Dispatch = {
     unique_click_count: number;
 };
 
+type TemplateOption = { value: number; label: string; html: string };
+
 const props = defineProps<{
     campaign: Campaign;
     segments: Option[];
     frequencies: { value: string; label: string }[];
+    templates: TemplateOption[];
     dispatches: Dispatch[];
 }>();
 
@@ -95,6 +98,7 @@ const form = useForm<{
     from_email: string;
     reply_to_email: string;
     segment_id: string;
+    template_id: string;
     content: Block[];
     track_opens: boolean;
     track_clicks: boolean;
@@ -108,6 +112,9 @@ const form = useForm<{
     reply_to_email: props.campaign.reply_to_email ?? '',
     segment_id: props.campaign.segment_id
         ? String(props.campaign.segment_id)
+        : 'none',
+    template_id: props.campaign.template_id
+        ? String(props.campaign.template_id)
         : 'none',
     content: props.campaign.content ?? [],
     track_opens: props.campaign.track_opens,
@@ -124,7 +131,14 @@ const formatDateTime = (value: string | null) =>
           })
         : '—';
 
-const renderedHtml = computed(() => renderEmail(form.content));
+const selectedTemplateHtml = computed(
+    () =>
+        props.templates.find((t) => String(t.value) === form.template_id)?.html,
+);
+
+const renderedHtml = computed(() =>
+    renderEmail(form.content, selectedTemplateHtml.value),
+);
 
 const debouncedHtml = ref(renderedHtml.value);
 let previewTimer: ReturnType<typeof setTimeout> | undefined;
@@ -145,7 +159,8 @@ const submit = () => {
     form.transform((data) => ({
         ...data,
         segment_id: data.segment_id === 'none' ? null : data.segment_id,
-        html: renderEmail(data.content),
+        template_id: data.template_id === 'none' ? null : data.template_id,
+        html: renderEmail(data.content, selectedTemplateHtml.value),
     })).put(updateCampaignRoute(props.campaign.id).url, {
         preserveScroll: true,
     });
@@ -271,7 +286,7 @@ const tabs = [
                 <!-- Settings -->
                 <div
                     v-show="tab === 'settings'"
-                    class="grid gap-4 sm:grid-cols-2"
+                    class="grid items-start gap-4 sm:grid-cols-2"
                 >
                     <div class="grid gap-2">
                         <Label for="name" :class="labelClass"
@@ -336,7 +351,7 @@ const tabs = [
                         <Label :class="labelClass">Segment</Label>
                         <Select v-model="form.segment_id">
                             <SelectTrigger
-                                class="!h-11 border-[hsl(var(--ds-line))]"
+                                class="!h-11 w-full border-[hsl(var(--ds-line))]"
                             >
                                 <SelectValue placeholder="Whole list" />
                             </SelectTrigger>
@@ -352,6 +367,32 @@ const tabs = [
                             </SelectContent>
                         </Select>
                         <InputError :message="form.errors.segment_id" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label :class="labelClass">Template</Label>
+                        <Select v-model="form.template_id">
+                            <SelectTrigger
+                                class="!h-11 w-full border-[hsl(var(--ds-line))]"
+                            >
+                                <SelectValue placeholder="No template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none"
+                                    >No template</SelectItem
+                                >
+                                <SelectItem
+                                    v-for="option in templates"
+                                    :key="option.value"
+                                    :value="String(option.value)"
+                                >
+                                    {{ option.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p class="text-xs text-[hsl(var(--ds-ink-faint))]">
+                            Wraps your content in the template's layout.
+                        </p>
+                        <InputError :message="form.errors.template_id" />
                     </div>
                 </div>
 
@@ -386,12 +427,12 @@ const tabs = [
 
                 <!-- Schedule + tracking -->
                 <div v-show="tab === 'sending'" class="space-y-6">
-                    <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid items-start gap-4 sm:grid-cols-2">
                         <div class="grid gap-2">
                             <Label :class="labelClass">Frequency</Label>
                             <Select v-model="form.frequency">
                                 <SelectTrigger
-                                    class="!h-11 border-[hsl(var(--ds-line))]"
+                                    class="!h-11 w-full border-[hsl(var(--ds-line))]"
                                 >
                                     <SelectValue />
                                 </SelectTrigger>
@@ -475,9 +516,7 @@ const tabs = [
                                     }}
                                 </span>
                                 <span class="text-[hsl(var(--ds-ink-soft))]">
-                                    {{
-                                        formatCount(dispatch.sent_to_count)
-                                    }}
+                                    {{ formatCount(dispatch.sent_to_count) }}
                                     sent
                                 </span>
                                 <span class="text-[hsl(var(--ds-ink-faint))]">

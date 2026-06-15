@@ -73,9 +73,21 @@ export const renderBlocks = (blocks: Block[]): string =>
     blocks.map(renderBlock).join('\n');
 
 /**
- * Render the blocks into a full, email-friendly HTML document.
+ * Render the blocks into a full, email-friendly HTML document. When a template
+ * is supplied, the rendered blocks fill its [[[content]]] slot; otherwise the
+ * blocks are wrapped in a basic responsive container.
  */
-export const renderEmail = (blocks: Block[]): string =>
+export const renderEmail = (blocks: Block[], templateHtml?: string): string => {
+    const body = renderBlocks(blocks);
+
+    if (templateHtml && /\[\[\[\s*content\s*\]\]\]/.test(templateHtml)) {
+        return templateHtml.replace(/\[\[\[\s*content\s*\]\]\]/g, body);
+    }
+
+    return defaultWrapper(body);
+};
+
+const defaultWrapper = (body: string): string =>
     `<!DOCTYPE html>
 <html>
   <body style="margin:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
@@ -83,7 +95,7 @@ export const renderEmail = (blocks: Block[]): string =>
       <tr><td align="center" style="padding:24px 12px;">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;max-width:600px;">
           <tr><td style="padding:32px;">
-${renderBlocks(blocks)}
+${body}
           </td></tr>
         </table>
       </td></tr>

@@ -134,6 +134,42 @@ test('campaign content blocks are saved', function () {
     expect($campaign->html)->toContain('Hello');
 });
 
+test('a campaign template can be selected and wraps the content', function () {
+    $this->actingAs(User::factory()->create());
+
+    $campaign = Campaign::factory()->create();
+    $template = Template::factory()->create([
+        'html' => '<div class="layout">[[[content]]]</div>',
+    ]);
+
+    $this->put(route('campaigns.update', $campaign), [
+        'name' => $campaign->name,
+        'template_id' => $template->id,
+        'content' => [
+            ['id' => 'a', 'type' => 'text', 'data' => ['text' => 'Hi there']],
+        ],
+        'html' => '<div class="layout"><div>Hi there</div></div>',
+    ])->assertRedirect(route('campaigns.edit', $campaign));
+
+    $campaign->refresh();
+    expect($campaign->template_id)->toBe($template->id);
+    expect($campaign->html)->toContain('class="layout"');
+});
+
+test('the edit page exposes templates', function () {
+    $this->actingAs(User::factory()->create());
+
+    $campaign = Campaign::factory()->create();
+    Template::factory()->create(['name' => 'Newsletter']);
+
+    $this->get(route('campaigns.edit', $campaign))->assertInertia(
+        fn ($page) => $page
+            ->has('templates', 1)
+            ->where('templates.0.label', 'Newsletter')
+            ->has('templates.0.html')
+    );
+});
+
 test('a sent campaign cannot be edited', function () {
     $this->actingAs(User::factory()->create());
 

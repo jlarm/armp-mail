@@ -29,6 +29,7 @@ class UpdateCampaignRequest extends FormRequest
             'from_email' => ['nullable', 'string', 'email', 'max:255'],
             'reply_to_email' => ['nullable', 'string', 'email', 'max:255'],
             'segment_id' => ['nullable', Rule::exists('segments', 'id')->where('email_list_id', $listId)],
+            'template_id' => ['nullable', Rule::exists('templates', 'id')],
             'content' => ['nullable', 'array'],
             'content.*.id' => ['nullable', 'string'],
             'content.*.type' => ['required_with:content', 'string'],
