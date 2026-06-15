@@ -9,6 +9,7 @@ import {
     Plus,
     Reply,
     Search,
+    Settings,
     Upload,
     Users,
 } from 'lucide-vue-next';
@@ -27,7 +28,11 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { index as listsRoute, show as showRoute } from '@/routes/lists';
+import {
+    edit as editListRoute,
+    index as listsRoute,
+    show as showRoute,
+} from '@/routes/lists';
 import {
     edit as editSubscriberRoute,
     importMethod as importSubscribersRoute,
@@ -182,13 +187,27 @@ const importOpen = ref(false);
                 </div>
             </div>
 
-            <span
-                v-if="list.requires_confirmation"
-                class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-[hsl(var(--ds-line))] px-3 py-1 text-[11px] font-semibold tracking-wide text-[hsl(var(--ds-ink-soft))] uppercase sm:self-auto"
+            <div
+                class="flex shrink-0 items-center gap-3 self-start sm:self-auto"
             >
-                <MailCheck class="size-3.5" />
-                Double opt-in
-            </span>
+                <span
+                    v-if="list.requires_confirmation"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--ds-line))] px-3 py-1 text-[11px] font-semibold tracking-wide text-[hsl(var(--ds-ink-soft))] uppercase"
+                >
+                    <MailCheck class="size-3.5" />
+                    Double opt-in
+                </span>
+                <Button
+                    as-child
+                    variant="outline"
+                    class="h-10 border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] font-semibold text-[hsl(var(--ds-ink))] hover:bg-[hsl(var(--ds-accent)/0.08)]"
+                >
+                    <Link :href="editListRoute(list.slug)">
+                        <Settings class="size-4" />
+                        Settings
+                    </Link>
+                </Button>
+            </div>
         </header>
 
         <!-- Sender details -->

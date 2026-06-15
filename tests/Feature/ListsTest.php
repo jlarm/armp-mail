@@ -263,6 +263,76 @@ test('importing requires a csv file', function () {
         ->assertSessionHasErrors('file');
 });
 
+test('the list settings page can be viewed', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+
+    $this->get(route('lists.edit', $list))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('Lists/Edit')
+                ->where('list.slug', $list->slug)
+                ->where('list.name', $list->name)
+        );
+});
+
+test('a list can be updated', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create(['slug' => 'old-slug']);
+
+    $this->put(route('lists.update', $list), [
+        'name' => 'Updated List',
+        'slug' => 'updated-list',
+        'description' => 'A renamed list',
+        'default_from_name' => 'Desk',
+        'default_from_email' => 'desk@example.com',
+        'default_reply_to_email' => 'reply@example.com',
+        'requires_confirmation' => true,
+        'redirect_after_subscribed' => 'https://example.com/welcome',
+        'redirect_after_unsubscribed' => 'https://example.com/bye',
+        'campaign_mails_per_minute' => 60,
+    ])->assertRedirect(route('lists.edit', 'updated-list'));
+
+    $this->assertDatabaseHas('email_lists', [
+        'id' => $list->id,
+        'name' => 'Updated List',
+        'slug' => 'updated-list',
+        'default_from_email' => 'desk@example.com',
+        'requires_confirmation' => true,
+        'campaign_mails_per_minute' => 60,
+    ]);
+});
+
+test('updating a list requires sender details and a unique slug', function () {
+    $this->actingAs(User::factory()->create());
+
+    $other = EmailList::factory()->create(['slug' => 'taken']);
+    $list = EmailList::factory()->create();
+
+    $this->put(route('lists.update', $list), [
+        'name' => '',
+        'slug' => 'taken',
+        'default_from_name' => '',
+        'default_from_email' => 'not-an-email',
+    ])->assertSessionHasErrors(['name', 'slug', 'default_from_name', 'default_from_email']);
+});
+
+test('a list keeps its own slug on update', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create(['slug' => 'keep-me']);
+
+    $this->put(route('lists.update', $list), [
+        'name' => $list->name,
+        'slug' => 'keep-me',
+        'default_from_name' => $list->default_from_name,
+        'default_from_email' => $list->default_from_email,
+    ])->assertSessionHasNoErrors();
+});
+
 test('a subscriber edit page can be viewed', function () {
     $this->actingAs(User::factory()->create());
 

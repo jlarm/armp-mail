@@ -12,6 +12,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('lists', [ListsController::class, 'index'])->name('lists.index');
     Route::post('lists', [ListsController::class, 'store'])->name('lists.store');
     Route::get('lists/{list:slug}', [ListsController::class, 'show'])->name('lists.show');
+    Route::get('lists/{list:slug}/edit', [ListsController::class, 'edit'])->name('lists.edit');
+    Route::put('lists/{list:slug}', [ListsController::class, 'update'])->name('lists.update');
     Route::post('lists/{list:slug}/subscribers', [ListSubscriberController::class, 'store'])->name('lists.subscribers.store');
     Route::post('lists/{list:slug}/subscribers/import', [ListSubscriberController::class, 'import'])->name('lists.subscribers.import');
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreEmailListRequest;
+use App\Http\Requests\UpdateEmailListRequest;
 use App\Models\EmailList;
 use App\Models\Subscriber;
 use Illuminate\Http\RedirectResponse;
@@ -85,6 +86,39 @@ class ListsController extends Controller
             'subscribers' => $subscribers,
             'filters' => ['search' => $search],
         ]);
+    }
+
+    /**
+     * Show the settings page for an email list.
+     */
+    public function edit(EmailList $list): Response
+    {
+        return Inertia::render('Lists/Edit', [
+            'list' => [
+                'name' => $list->name,
+                'slug' => $list->slug,
+                'description' => $list->description,
+                'default_from_name' => $list->default_from_name,
+                'default_from_email' => $list->default_from_email,
+                'default_reply_to_email' => $list->default_reply_to_email,
+                'requires_confirmation' => $list->requires_confirmation,
+                'redirect_after_subscribed' => $list->redirect_after_subscribed,
+                'redirect_after_unsubscribed' => $list->redirect_after_unsubscribed,
+                'campaign_mails_per_minute' => $list->campaign_mails_per_minute,
+            ],
+        ]);
+    }
+
+    /**
+     * Update an email list's settings.
+     */
+    public function update(UpdateEmailListRequest $request, EmailList $list): RedirectResponse
+    {
+        $list->update($request->validated());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('List updated.')]);
+
+        return to_route('lists.edit', $list);
     }
 
     /**
