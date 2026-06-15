@@ -7,10 +7,12 @@ use App\Models\Campaign;
 use App\Models\CampaignDispatch;
 use App\Models\EmailList;
 use App\Models\Segment;
+use App\Models\Send;
 use App\Models\Subscriber;
 use App\Models\Template;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 test('guests are redirected from campaigns', function () {
     $this->get(route('campaigns.index'))->assertRedirect(route('login'));
@@ -225,6 +227,99 @@ test('the scheduler ignores cancelled and not-due campaigns', function () {
     $this->artisan('campaigns:dispatch-due')->assertSuccessful();
 
     expect(CampaignDispatch::count())->toBe(0);
+});
+
+test('dispatching sends an email per subscriber with tracking', function () {
+    $list = EmailList::factory()->create();
+    $list->subscribers()->attach(
+        Subscriber::factory()->count(2)->create(),
+        ['status' => Status::SUBSCRIBED->value],
+    );
+
+    $campaign = Campaign::factory()->create([
+        'email_list_id' => $list->id,
+        'frequency' => CampaignFrequency::ONCE,
+        'next_run_at' => now()->subMinute(),
+        'status' => CampaignStatus::DRAFT,
+        'html' => '<html><body><a href="https://example.com">Go</a></body></html>',
+        'structured_html' => '<html><body><a href="https://example.com">Go</a></body></html>',
+        'track_opens' => true,
+        'track_clicks' => true,
+    ]);
+
+    $this->artisan('campaigns:dispatch-due')->assertSuccessful();
+
+    $dispatch = $campaign->dispatches()->sole();
+    expect($dispatch->status)->toBe('sent');
+    expect($dispatch->sent_to_count)->toBe(2);
+    expect(Send::where('sendable_id', $dispatch->id)->count())->toBe(2);
+});
+
+test('opening the pixel records an open and rolls up the dispatch', function () {
+    $campaign = Campaign::factory()->create();
+    $dispatch = $campaign->dispatches()->create([
+        'status' => 'sent',
+        'scheduled_at' => now(),
+        'sent_at' => now(),
+    ]);
+
+    $send = new Send;
+    $send->uuid = (string) Str::ulid();
+    $send->subscriber_id = Subscriber::factory()->create()->id;
+    $send->sent_at = now();
+    $send->sendable()->associate($dispatch);
+    $send->save();
+
+    $this->get(route('campaigns.track.open', $send->uuid))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/gif');
+
+    expect($send->fresh()->opened_at)->not->toBeNull();
+    $dispatch->refresh();
+    expect($dispatch->open_count)->toBe(1);
+    expect($dispatch->unique_open_count)->toBe(1);
+
+    // A second open bumps total but not unique.
+    $this->get(route('campaigns.track.open', $send->uuid))->assertOk();
+    $dispatch->refresh();
+    expect($dispatch->open_count)->toBe(2);
+    expect($dispatch->unique_open_count)->toBe(1);
+});
+
+test('clicking records a click and redirects to the original url', function () {
+    $campaign = Campaign::factory()->create();
+    $dispatch = $campaign->dispatches()->create([
+        'status' => 'sent',
+        'scheduled_at' => now(),
+        'sent_at' => now(),
+    ]);
+
+    $send = new Send;
+    $send->uuid = (string) Str::ulid();
+    $send->subscriber_id = Subscriber::factory()->create()->id;
+    $send->sent_at = now();
+    $send->sendable()->associate($dispatch);
+    $send->save();
+
+    $this->get(route('campaigns.track.click', ['send' => $send->uuid, 'u' => 'https://example.com/page']))
+        ->assertRedirect('https://example.com/page');
+
+    expect($send->fresh()->clicked_at)->not->toBeNull();
+    expect($dispatch->refresh()->unique_click_count)->toBe(1);
+});
+
+test('clicking without a valid url 404s', function () {
+    $campaign = Campaign::factory()->create();
+    $dispatch = $campaign->dispatches()->create(['status' => 'sent', 'scheduled_at' => now()]);
+
+    $send = new Send;
+    $send->uuid = (string) Str::ulid();
+    $send->subscriber_id = Subscriber::factory()->create()->id;
+    $send->sendable()->associate($dispatch);
+    $send->save();
+
+    $this->get(route('campaigns.track.click', ['send' => $send->uuid, 'u' => 'javascript:alert(1)']))
+        ->assertNotFound();
 });
 
 test('the campaign frequency enum computes the next run', function () {

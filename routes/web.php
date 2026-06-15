@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\CampaignTrackingController;
 use App\Http\Controllers\ListsController;
 use App\Http\Controllers\ListSegmentController;
 use App\Http\Controllers\ListSubscriberController;
@@ -9,6 +10,10 @@ use App\Http\Controllers\TemplateController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+
+// Public email tracking endpoints (hit by recipients, no auth).
+Route::get('e/o/{send:uuid}', [CampaignTrackingController::class, 'open'])->name('campaigns.track.open');
+Route::get('e/c/{send:uuid}', [CampaignTrackingController::class, 'click'])->name('campaigns.track.click');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');

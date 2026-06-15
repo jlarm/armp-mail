@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\CampaignStatus;
-use App\Enums\Status;
+use App\Jobs\SendCampaignDispatch;
 use App\Models\Campaign;
 use App\Models\CampaignDispatch;
 use Illuminate\Console\Attributes\Description;
@@ -36,18 +36,13 @@ class DispatchDueCampaigns extends Command
 
     private function dispatchCampaign(Campaign $campaign): void
     {
-        $recipients = $campaign->emailList
-            ?->subscribers()
-            ->wherePivot('status', Status::SUBSCRIBED->value)
-            ->count() ?? 0;
-
-        CampaignDispatch::create([
+        $dispatch = CampaignDispatch::create([
             'campaign_id' => $campaign->id,
-            'status' => 'sent',
+            'status' => 'pending',
             'scheduled_at' => $campaign->next_run_at,
-            'sent_at' => now(),
-            'sent_to_count' => $recipients,
         ]);
+
+        SendCampaignDispatch::dispatch($dispatch);
 
         $next = $campaign->frequency->nextRunAfter(Carbon::now());
 
