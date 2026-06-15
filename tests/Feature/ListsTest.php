@@ -262,3 +262,106 @@ test('importing requires a csv file', function () {
     $this->post(route('lists.subscribers.import', $list), [])
         ->assertSessionHasErrors('file');
 });
+
+test('a subscriber edit page can be viewed', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $subscriber = Subscriber::factory()->create([
+        'email' => 'edit@example.com',
+        'extra_attributes' => ['tags' => ['VIP'], 'mailcoach_tags' => 'x'],
+    ]);
+    $list->subscribers()->attach($subscriber);
+
+    $this->get(route('lists.subscribers.edit', [$list, $subscriber]))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('Lists/Subscribers/Edit')
+                ->where('subscriber.email', 'edit@example.com')
+                ->where('subscriber.tags', ['VIP'])
+                ->where('subscriber.attributes', [['key' => 'mailcoach_tags', 'value' => 'x']])
+        );
+});
+
+test('a subscriber on another list cannot be edited via this list', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $otherList = EmailList::factory()->create();
+    $subscriber = Subscriber::factory()->create();
+    $otherList->subscribers()->attach($subscriber);
+
+    $this->get(route('lists.subscribers.edit', [$list, $subscriber]))
+        ->assertNotFound();
+});
+
+test('a subscriber can be updated with tags and attributes', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $subscriber = Subscriber::factory()->create();
+    $list->subscribers()->attach($subscriber);
+
+    $this->put(route('lists.subscribers.update', [$list, $subscriber]), [
+        'email' => 'updated@example.com',
+        'first_name' => 'Joe',
+        'last_name' => 'Lohr',
+        'tags' => ['Joe Lohr', 'Test Dealership'],
+        'attributes' => [
+            ['key' => 'role', 'value' => 'Owner'],
+            ['key' => '', 'value' => 'ignored'],
+        ],
+    ])->assertRedirect(route('lists.subscribers.edit', [$list, $subscriber]));
+
+    $subscriber->refresh();
+
+    expect($subscriber->email)->toBe('updated@example.com');
+    expect($subscriber->first_name)->toBe('Joe');
+    expect($subscriber->extra_attributes)->toBe([
+        'role' => 'Owner',
+        'tags' => ['Joe Lohr', 'Test Dealership'],
+    ]);
+});
+
+test('updating to an email used by another subscriber fails', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    Subscriber::factory()->create(['email' => 'taken@example.com']);
+    $subscriber = Subscriber::factory()->create(['email' => 'mine@example.com']);
+    $list->subscribers()->attach($subscriber);
+
+    $this->put(route('lists.subscribers.update', [$list, $subscriber]), [
+        'email' => 'taken@example.com',
+    ])->assertSessionHasErrors('email');
+});
+
+test('a subscriber can be unsubscribed from a list', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $subscriber = Subscriber::factory()->create();
+    $list->subscribers()->attach($subscriber, ['status' => Status::SUBSCRIBED->value]);
+
+    $this->post(route('lists.subscribers.unsubscribe', [$list, $subscriber]))
+        ->assertRedirect(route('lists.subscribers.edit', [$list, $subscriber]));
+
+    $pivot = $list->subscribers()->find($subscriber->id)->pivot;
+
+    expect($pivot->status)->toBe(Status::UNSUBSCRIBED);
+    expect($pivot->unsubscribed_at)->not->toBeNull();
+});
+
+test('a subscriber can be deleted', function () {
+    $this->actingAs(User::factory()->create());
+
+    $list = EmailList::factory()->create();
+    $subscriber = Subscriber::factory()->create();
+    $list->subscribers()->attach($subscriber);
+
+    $this->delete(route('lists.subscribers.destroy', [$list, $subscriber]))
+        ->assertRedirect(route('lists.show', $list));
+
+    $this->assertDatabaseMissing('subscribers', ['id' => $subscriber->id]);
+});

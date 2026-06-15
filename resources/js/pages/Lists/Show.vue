@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { index as listsRoute, show as showRoute } from '@/routes/lists';
 import {
+    edit as editSubscriberRoute,
     importMethod as importSubscribersRoute,
     store as storeSubscriberRoute,
 } from '@/routes/lists/subscribers';
@@ -488,40 +489,46 @@ const importOpen = ref(false);
                 v-else
                 class="divide-y divide-[hsl(var(--ds-line))] overflow-hidden rounded-2xl border border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))]"
             >
-                <li
-                    v-for="subscriber in subscribers.data"
-                    :key="subscriber.id"
-                    class="flex items-center gap-4 px-5 py-3.5"
-                >
-                    <div class="min-w-0 flex-1">
-                        <p
-                            class="truncate text-sm font-medium text-[hsl(var(--ds-ink))]"
-                        >
-                            {{ subscriber.name || subscriber.email }}
-                        </p>
-                        <p
-                            v-if="subscriber.name"
-                            class="truncate text-xs text-[hsl(var(--ds-ink-faint))]"
-                        >
-                            {{ subscriber.email }}
-                        </p>
-                    </div>
-
-                    <span
-                        class="shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
-                        :class="
-                            statusClasses[subscriber.status] ??
-                            statusClasses.unconfirmed
+                <li v-for="subscriber in subscribers.data" :key="subscriber.id">
+                    <Link
+                        :href="
+                            editSubscriberRoute({
+                                list: list.slug,
+                                subscriber: subscriber.id,
+                            })
                         "
+                        class="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-[hsl(var(--ds-accent)/0.04)]"
                     >
-                        {{ statusLabel(subscriber.status) }}
-                    </span>
+                        <div class="min-w-0 flex-1">
+                            <p
+                                class="truncate text-sm font-medium text-[hsl(var(--ds-ink))]"
+                            >
+                                {{ subscriber.name || subscriber.email }}
+                            </p>
+                            <p
+                                v-if="subscriber.name"
+                                class="truncate text-xs text-[hsl(var(--ds-ink-faint))]"
+                            >
+                                {{ subscriber.email }}
+                            </p>
+                        </div>
 
-                    <span
-                        class="hidden w-24 shrink-0 text-right text-xs text-[hsl(var(--ds-ink-faint))] sm:block"
-                    >
-                        {{ formatDate(subscriber.subscribed_at) }}
-                    </span>
+                        <span
+                            class="shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                            :class="
+                                statusClasses[subscriber.status] ??
+                                statusClasses.unconfirmed
+                            "
+                        >
+                            {{ statusLabel(subscriber.status) }}
+                        </span>
+
+                        <span
+                            class="hidden w-24 shrink-0 text-right text-xs text-[hsl(var(--ds-ink-faint))] sm:block"
+                        >
+                            {{ formatDate(subscriber.subscribed_at) }}
+                        </span>
+                    </Link>
                 </li>
             </ul>
 

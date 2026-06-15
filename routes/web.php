@@ -14,6 +14,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('lists/{list:slug}', [ListsController::class, 'show'])->name('lists.show');
     Route::post('lists/{list:slug}/subscribers', [ListSubscriberController::class, 'store'])->name('lists.subscribers.store');
     Route::post('lists/{list:slug}/subscribers/import', [ListSubscriberController::class, 'import'])->name('lists.subscribers.import');
+
+    Route::scopeBindings()->group(function (): void {
+        Route::get('lists/{list:slug}/subscribers/{subscriber}/edit', [ListSubscriberController::class, 'edit'])->name('lists.subscribers.edit');
+        Route::put('lists/{list:slug}/subscribers/{subscriber}', [ListSubscriberController::class, 'update'])->name('lists.subscribers.update');
+        Route::post('lists/{list:slug}/subscribers/{subscriber}/unsubscribe', [ListSubscriberController::class, 'unsubscribe'])->name('lists.subscribers.unsubscribe');
+        Route::delete('lists/{list:slug}/subscribers/{subscriber}', [ListSubscriberController::class, 'destroy'])->name('lists.subscribers.destroy');
+    });
 });
 
 require __DIR__.'/settings.php';
