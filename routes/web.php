@@ -4,12 +4,19 @@ use App\Http\Controllers\ListsController;
 use App\Http\Controllers\ListSegmentController;
 use App\Http\Controllers\ListSubscriberController;
 use App\Http\Controllers\ListTagController;
+use App\Http\Controllers\TemplateController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+
+    Route::post('templates/images', [TemplateController::class, 'uploadImage'])->name('templates.images');
+    Route::resource('templates', TemplateController::class)->except(['show']);
+    Route::post('templates/{template}/campaign', [TemplateController::class, 'campaign'])->name('templates.campaign');
+    Route::post('templates/{template}/duplicate', [TemplateController::class, 'duplicate'])->name('templates.duplicate');
+    Route::post('templates/{template}/test', [TemplateController::class, 'test'])->name('templates.test');
 
     Route::get('lists', [ListsController::class, 'index'])->name('lists.index');
     Route::post('lists', [ListsController::class, 'store'])->name('lists.store');

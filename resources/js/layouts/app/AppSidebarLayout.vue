@@ -4,6 +4,7 @@ import {
     ChevronsUpDown,
     Layers,
     LayoutGrid,
+    LayoutTemplate,
     Mailbox,
     Menu,
     PanelLeft,
@@ -27,6 +28,7 @@ import { getInitials } from '@/composables/useInitials';
 import { toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { index as lists } from '@/routes/lists';
+import { index as templates } from '@/routes/templates';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
 type Props = {
@@ -67,6 +69,12 @@ const sections: DeskSection[] = [
                 icon: Mailbox,
                 soon: true,
             },
+        ],
+    },
+    {
+        label: 'Library',
+        items: [
+            { title: 'Templates', href: templates(), icon: LayoutTemplate },
         ],
     },
     {
