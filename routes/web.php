@@ -14,9 +14,11 @@ use Illuminate\Support\Facades\Route;
 Route::inertia('/', 'Welcome')->name('home');
 
 // Public email tracking endpoints (hit by recipients, no auth).
-Route::get('e/o/{send:uuid}', [CampaignTrackingController::class, 'open'])->name('campaigns.track.open');
-Route::get('e/c/{send:uuid}', [CampaignTrackingController::class, 'click'])->name('campaigns.track.click');
-Route::get('e/u/{send:uuid}', [CampaignTrackingController::class, 'unsubscribe'])->name('campaigns.track.unsubscribe');
+Route::middleware('throttle:120,1')->group(function () {
+    Route::get('e/o/{send:uuid}', [CampaignTrackingController::class, 'open'])->name('campaigns.track.open');
+    Route::get('e/c/{send:uuid}', [CampaignTrackingController::class, 'click'])->name('campaigns.track.click');
+    Route::get('e/u/{send:uuid}', [CampaignTrackingController::class, 'unsubscribe'])->name('campaigns.track.unsubscribe');
+});
 
 // Mailgun webhook — signature verified inside the controller.
 Route::post('webhooks/mailgun', [MailgunWebhookController::class, 'handle'])->name('webhooks.mailgun');

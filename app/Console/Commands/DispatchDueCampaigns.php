@@ -12,6 +12,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 #[Signature('campaigns:dispatch-due')]
 #[Description('Materialise a dispatch for every campaign whose next run is due.')]
@@ -19,17 +20,33 @@ class DispatchDueCampaigns extends Command
 {
     public function handle(): int
     {
-        $due = Campaign::query()
+        $ids = Campaign::query()
             ->whereNotNull('next_run_at')
             ->where('next_run_at', '<=', now())
             ->whereNotIn('status', [CampaignStatus::CANCELLED->value, CampaignStatus::PAUSED->value])
-            ->get();
+            ->pluck('id');
 
-        foreach ($due as $campaign) {
-            $this->dispatchCampaign($campaign);
+        $dispatched = 0;
+
+        foreach ($ids as $id) {
+            DB::transaction(function () use ($id, &$dispatched): void {
+                $campaign = Campaign::query()
+                    ->whereNotNull('next_run_at')
+                    ->where('next_run_at', '<=', now())
+                    ->whereNotIn('status', [CampaignStatus::CANCELLED->value, CampaignStatus::PAUSED->value])
+                    ->lockForUpdate()
+                    ->find($id);
+
+                if ($campaign === null) {
+                    return;
+                }
+
+                $this->dispatchCampaign($campaign);
+                $dispatched++;
+            });
         }
 
-        $this->info("Dispatched {$due->count()} campaign(s).");
+        $this->info("Dispatched {$dispatched} campaign(s).");
 
         return self::SUCCESS;
     }

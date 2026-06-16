@@ -104,21 +104,26 @@ HTML;
     private function record(Send $send, SendFeedbackType $type, Request $request, ?string $url = null): void
     {
         $column = $type === SendFeedbackType::OPEN ? 'opened_at' : 'clicked_at';
-        $isFirst = $send->{$column} === null;
 
-        if ($isFirst) {
-            $send->forceFill([$column => now()])->save();
-        }
+        // Atomic: only update if still null. The number of affected rows tells
+        // us whether this is the first event without a TOCTOU race condition.
+        $isFirst = Send::where('id', $send->id)
+            ->whereNull($column)
+            ->update([$column => now()]) === 1;
 
         $dispatch = $send->sendable;
 
         if ($dispatch instanceof CampaignDispatch) {
             if ($type === SendFeedbackType::OPEN) {
                 $dispatch->increment('open_count');
-                $isFirst && $dispatch->increment('unique_open_count');
+                if ($isFirst) {
+                    $dispatch->increment('unique_open_count');
+                }
             } else {
                 $dispatch->increment('click_count');
-                $isFirst && $dispatch->increment('unique_click_count');
+                if ($isFirst) {
+                    $dispatch->increment('unique_click_count');
+                }
             }
         }
 

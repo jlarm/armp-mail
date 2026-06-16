@@ -13,12 +13,19 @@ use App\Models\Subscriber;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Mail\Message;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class SendCampaignDispatch implements ShouldQueue
 {
     use Queueable;
+
+    /** Retry up to 3 times before marking failed. */
+    public int $tries = 3;
+
+    /** Kill the job after 2 hours — enough for very large lists. */
+    public int $timeout = 7200;
 
     public function __construct(public CampaignDispatch $dispatch) {}
 
@@ -62,27 +69,37 @@ class SendCampaignDispatch implements ShouldQueue
                     (bool) $campaign->track_clicks,
                 );
 
-                Mail::html($html, function (Message $message) use ($campaign, $subscriber, $send): void {
-                    $message->to($subscriber->email)
-                        ->subject($campaign->subject ?: $campaign->name);
+                try {
+                    Mail::html($html, function (Message $message) use ($campaign, $subscriber, $send): void {
+                        $message->to($subscriber->email)
+                            ->subject($campaign->subject ?: $campaign->name);
 
-                    if ($campaign->from_email) {
-                        $message->from($campaign->from_email, $campaign->from_name ?: null);
-                    }
+                        if ($campaign->from_email) {
+                            $message->from($campaign->from_email, $campaign->from_name ?: null);
+                        }
 
-                    if ($campaign->reply_to_email) {
-                        $message->replyTo($campaign->reply_to_email);
-                    }
+                        if ($campaign->reply_to_email) {
+                            $message->replyTo($campaign->reply_to_email);
+                        }
 
-                    // Embed the Send UUID so Mailgun webhook events can look
-                    // up this exact delivery record.
-                    $message->getSymfonyMessage()->getHeaders()->addTextHeader(
-                        'X-Mailgun-Variables',
-                        (string) json_encode(['send_uuid' => $send->uuid]),
-                    );
-                });
+                        // Embed the Send UUID so Mailgun webhook events can look
+                        // up this exact delivery record.
+                        $message->getSymfonyMessage()->getHeaders()->addTextHeader(
+                            'X-Mailgun-Variables',
+                            (string) json_encode(['send_uuid' => $send->uuid]),
+                        );
+                    });
 
-                $sent++;
+                    $sent++;
+                } catch (\Throwable $e) {
+                    Log::warning('Campaign mail failed for subscriber', [
+                        'send_uuid' => $send->uuid,
+                        'subscriber_id' => $subscriber->id,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    $send->forceFill(['failed_at' => now(), 'failure_reason' => $e->getMessage()])->save();
+                }
             });
 
         $this->dispatch->update([
@@ -90,6 +107,20 @@ class SendCampaignDispatch implements ShouldQueue
             'sent_at' => now(),
             'sent_to_count' => $sent,
         ]);
+    }
+
+    /**
+     * Handle a job failure after all retries are exhausted.
+     */
+    public function failed(\Throwable $e): void
+    {
+        Log::error('SendCampaignDispatch failed permanently', [
+            'dispatch_id' => $this->dispatch->id,
+            'campaign_id' => $this->dispatch->campaign_id,
+            'error' => $e->getMessage(),
+        ]);
+
+        $this->dispatch->update(['status' => 'failed']);
     }
 
     /**
