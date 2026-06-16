@@ -78,6 +78,14 @@ class SendCampaignDispatch implements ShouldQueue
      */
     private function prepareHtml(string $html, Send $send, bool $trackOpens, bool $trackClicks): string
     {
+        // Replace the unsubscribe placeholder before click tracking so the URL
+        // is not wrapped in a click-redirect URL.
+        $html = str_replace(
+            '[[[unsubscribe_url]]]',
+            route('campaigns.track.unsubscribe', ['send' => $send->uuid]),
+            $html,
+        );
+
         if ($trackClicks) {
             $html = (string) preg_replace_callback(
                 '/href="(https?:\/\/[^"]+)"/i',

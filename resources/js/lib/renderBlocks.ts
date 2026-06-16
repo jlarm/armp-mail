@@ -21,6 +21,9 @@ const escape = (value: unknown): string =>
 const str = (value: unknown): string =>
     typeof value === 'string' ? value : '';
 
+const textAlign = (data: Record<string, any>): string =>
+    ['left', 'center', 'right'].includes(data.align) ? data.align : 'left';
+
 const renderBlock = (block: Block): string => {
     switch (block.type) {
         case 'heading': {
@@ -29,15 +32,20 @@ const renderBlock = (block: Block): string => {
             const size = { 1: '28px', 2: '22px', 3: '18px' }[
                 level as 1 | 2 | 3
             ];
+            const align = textAlign(block.data);
 
-            return `<h${level} style="margin:0 0 16px;font-size:${size};line-height:1.3;color:#0f172a;">${escape(block.data.text)}</h${level}>`;
+            return `<h${level} style="margin:0 0 16px;font-size:${size};line-height:1.3;color:#0f172a;text-align:${align};">${escape(block.data.text)}</h${level}>`;
         }
-        case 'text':
-            return `<div style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">${str(block.data.text)}</div>`;
+        case 'text': {
+            const align = textAlign(block.data);
+
+            return `<div style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;text-align:${align};">${str(block.data.text)}</div>`;
+        }
         case 'button': {
             const url = escape(block.data.url || '#');
+            const align = textAlign(block.data);
 
-            return `<table cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:#e4502b;border-radius:8px;"><a href="${url}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 24px;color:#ffffff;text-decoration:none;font-weight:bold;">${escape(block.data.text || 'Button')}</a></td></tr></table>`;
+            return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td align="${align}"><table cellpadding="0" cellspacing="0"><tr><td style="background:#e4502b;border-radius:8px;"><a href="${url}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 24px;color:#ffffff;text-decoration:none;font-weight:bold;">${escape(block.data.text || 'Button')}</a></td></tr></table></td></tr></table>`;
         }
         case 'image':
             return str(block.data.url)

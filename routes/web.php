@@ -15,6 +15,7 @@ Route::inertia('/', 'Welcome')->name('home');
 // Public email tracking endpoints (hit by recipients, no auth).
 Route::get('e/o/{send:uuid}', [CampaignTrackingController::class, 'open'])->name('campaigns.track.open');
 Route::get('e/c/{send:uuid}', [CampaignTrackingController::class, 'click'])->name('campaigns.track.click');
+Route::get('e/u/{send:uuid}', [CampaignTrackingController::class, 'unsubscribe'])->name('campaigns.track.unsubscribe');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');

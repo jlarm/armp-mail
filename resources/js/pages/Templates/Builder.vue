@@ -6,6 +6,7 @@ import {
     Copy,
     Image,
     Info,
+    Link2,
     Monitor,
     Send,
     Smartphone,
@@ -107,11 +108,15 @@ const form = useForm({
 /* ----- Slot detection + sample-data preview ----- */
 const slotPattern = /\[\[\[\s*([a-zA-Z0-9_-]+)(?::(text|image))?\s*\]\]\]/g;
 
+const SYSTEM_PLACEHOLDERS = new Set(['unsubscribe_url']);
+
 const slots = computed(() => {
     const found = new Map<string, string>();
 
     for (const match of form.html.matchAll(slotPattern)) {
-        found.set(match[1], match[2] ?? 'editor');
+        if (!SYSTEM_PLACEHOLDERS.has(match[1])) {
+            found.set(match[1], match[2] ?? 'editor');
+        }
     }
 
     return [...found].map(([name, type]) => ({ name, type }));
@@ -455,6 +460,29 @@ const createCampaign = () => {
                                 />
                             </label>
                         </span>
+                    </div>
+
+                    <!-- System variables -->
+                    <div class="rounded-xl border border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] p-3">
+                        <p class="mb-2 text-[10px] font-semibold tracking-[0.16em] text-[hsl(var(--ds-ink-faint))] uppercase">
+                            System variables
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                class="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-paper))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--ds-ink))] transition-colors hover:border-[hsl(var(--ds-accent)/0.4)] hover:text-[hsl(var(--ds-accent-ink))]"
+                                title="Click to copy — paste into an href to create a one-click unsubscribe link"
+                                @click="navigator.clipboard.writeText('[[[unsubscribe_url]]]')"
+                            >
+                                <Link2 class="size-3.5 text-[hsl(var(--ds-ink-faint))]" />
+                                unsubscribe_url
+                                <span class="rounded bg-[hsl(var(--ds-accent)/0.1)] px-1.5 py-px text-[10px] font-semibold tracking-wide text-[hsl(var(--ds-accent-ink))] uppercase">auto</span>
+                            </button>
+                        </div>
+                        <p class="mt-2 text-[11px] text-[hsl(var(--ds-ink-faint))]">
+                            Replaced at send time with a unique link per recipient. Use as
+                            <code class="rounded bg-[hsl(var(--ds-paper))] px-1 text-[hsl(var(--ds-ink))]">href="[[[unsubscribe_url]]]"</code>.
+                        </p>
                     </div>
                 </div>
 

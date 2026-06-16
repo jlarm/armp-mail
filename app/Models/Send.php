@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
     'clicked_at',
     'bounced_at',
     'complained_at',
+    'unsubscribed_at',
 ])]
 class Send extends Model
 {
@@ -45,6 +46,7 @@ class Send extends Model
             'clicked_at' => 'datetime',
             'bounced_at' => 'datetime',
             'complained_at' => 'datetime',
+            'unsubscribed_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

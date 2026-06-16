@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import {
+    AlignCenter,
+    AlignLeft,
+    AlignRight,
     ChevronDown,
     ChevronUp,
     Code,
@@ -13,6 +16,7 @@ import {
     Type,
     Upload,
 } from 'lucide-vue-next';
+import { onClickOutside } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import RichTextField from '@/components/RichTextField.vue';
 import { Input } from '@/components/ui/input';
@@ -40,12 +44,14 @@ const BLOCK_TYPES: { type: BlockType; label: string; icon: unknown }[] = [
     { type: 'list', label: 'List', icon: List },
 ];
 
+const ALIGNABLE_TYPES: BlockType[] = ['text', 'heading', 'button'];
+
 const defaultData = (type: BlockType): Record<string, unknown> => {
     switch (type) {
         case 'heading':
-            return { level: 2, text: '' };
+            return { level: 2, text: '', align: 'left' };
         case 'button':
-            return { text: 'Click here', url: '' };
+            return { text: 'Click here', url: '', align: 'left' };
         case 'image':
             return { url: '', alt: '' };
         case 'list':
@@ -55,7 +61,7 @@ const defaultData = (type: BlockType): Record<string, unknown> => {
         case 'delimiter':
             return {};
         default:
-            return { text: '' };
+            return { text: '', align: 'left' };
     }
 };
 
@@ -67,6 +73,12 @@ const newId = () =>
 /* ----- Add menu ----- */
 const menuOpen = ref(false);
 const filter = ref('');
+const addMenuRef = ref<HTMLElement | null>(null);
+
+onClickOutside(addMenuRef, () => {
+    menuOpen.value = false;
+    filter.value = '';
+});
 
 const filteredTypes = computed(() => {
     const term = filter.value.trim().toLowerCase();
@@ -169,6 +181,26 @@ const uploadImage = async (block: Block, event: Event) => {
                     {{ blockLabel(block.type) }}
                 </span>
                 <div class="flex items-center gap-1">
+                    <template v-if="ALIGNABLE_TYPES.includes(block.type)">
+                        <button
+                            v-for="a in (['left', 'center', 'right'] as const)"
+                            :key="a"
+                            type="button"
+                            :aria-label="`Align ${a}`"
+                            :class="[
+                                'grid size-7 place-items-center rounded',
+                                block.data.align === a
+                                    ? 'text-[hsl(var(--ds-accent))]'
+                                    : 'text-[hsl(var(--ds-ink-faint))] hover:text-[hsl(var(--ds-ink))]',
+                            ]"
+                            @click="block.data.align = a"
+                        >
+                            <AlignLeft v-if="a === 'left'" class="size-4" />
+                            <AlignCenter v-else-if="a === 'center'" class="size-4" />
+                            <AlignRight v-else class="size-4" />
+                        </button>
+                        <div class="mx-0.5 h-4 w-px bg-[hsl(var(--ds-line))]" />
+                    </template>
                     <button
                         type="button"
                         class="grid size-7 place-items-center rounded text-[hsl(var(--ds-ink-faint))] hover:text-[hsl(var(--ds-ink))] disabled:opacity-40"
@@ -322,7 +354,7 @@ const uploadImage = async (block: Block, event: Event) => {
         </div>
 
         <!-- Add block -->
-        <div class="relative">
+        <div ref="addMenuRef" class="relative">
             <button
                 type="button"
                 class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[hsl(var(--ds-line))] py-2.5 text-sm font-medium text-[hsl(var(--ds-ink-soft))] transition-colors hover:bg-[hsl(var(--ds-accent)/0.06)] hover:text-[hsl(var(--ds-ink))]"
@@ -334,7 +366,7 @@ const uploadImage = async (block: Block, event: Event) => {
 
             <div
                 v-if="menuOpen"
-                class="absolute z-20 mt-1 w-64 overflow-hidden rounded-xl border border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] shadow-lg"
+                class="absolute bottom-full left-0 z-20 mb-1 w-64 overflow-hidden rounded-xl border border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] shadow-lg"
             >
                 <div class="border-b border-[hsl(var(--ds-line))] p-2">
                     <Input

@@ -306,9 +306,10 @@ const formatDate = (value: string | null) => {
                                 </span>
                             </div>
                             <p
+                                v-if="list.description"
                                 class="mt-0.5 truncate text-sm text-[hsl(var(--ds-ink-soft))]"
                             >
-                                {{ list.description || 'No description' }}
+                                {{ list.description }}
                             </p>
                             <p
                                 v-if="list.from_email"
