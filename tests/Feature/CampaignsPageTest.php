@@ -102,6 +102,7 @@ test('a draft campaign can be edited', function () {
 
     $this->put(route('campaigns.update', $campaign), [
         'name' => 'New name',
+        'email_list_id' => $campaign->email_list_id,
         'subject' => 'Updated',
         'html' => '<p>Body</p>',
         'track_opens' => true,
@@ -121,6 +122,7 @@ test('campaign content blocks are saved', function () {
 
     $this->put(route('campaigns.update', $campaign), [
         'name' => $campaign->name,
+        'email_list_id' => $campaign->email_list_id,
         'content' => [
             ['id' => 'a', 'type' => 'heading', 'data' => ['level' => 1, 'text' => 'Hello']],
             ['id' => 'b', 'type' => 'text', 'data' => ['text' => 'Body copy']],
@@ -144,6 +146,7 @@ test('a campaign template can be selected and wraps the content', function () {
 
     $this->put(route('campaigns.update', $campaign), [
         'name' => $campaign->name,
+        'email_list_id' => $campaign->email_list_id,
         'template_id' => $template->id,
         'content' => [
             ['id' => 'a', 'type' => 'text', 'data' => ['text' => 'Hi there']],
@@ -177,6 +180,7 @@ test('a sent campaign cannot be edited', function () {
 
     $this->put(route('campaigns.update', $campaign), [
         'name' => 'Nope',
+        'email_list_id' => $campaign->email_list_id,
     ])->assertForbidden();
 });
 
@@ -200,6 +204,7 @@ test('saving a recurring schedule sets the next run', function () {
 
     $this->put(route('campaigns.update', $campaign), [
         'name' => $campaign->name,
+        'email_list_id' => $campaign->email_list_id,
         'frequency' => 'weekly',
         'scheduled_at' => $runAt->format('Y-m-d\TH:i'),
     ])->assertRedirect(route('campaigns.edit', $campaign));

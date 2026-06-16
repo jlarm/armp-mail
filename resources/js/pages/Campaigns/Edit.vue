@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Send, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import BlockEditor from '@/components/BlockEditor.vue';
 import InputError from '@/components/InputError.vue';
@@ -30,6 +30,7 @@ import type { Block } from '@/lib/renderBlocks';
 import {
     destroy as destroyCampaignRoute,
     index as campaignsRoute,
+    test as testCampaignRoute,
     update as updateCampaignRoute,
 } from '@/routes/campaigns';
 
@@ -42,9 +43,9 @@ type Campaign = {
     from_name: string | null;
     from_email: string | null;
     reply_to_email: string | null;
+    email_list_id: number | null;
     segment_id: number | null;
     template_id: number | null;
-    list: string | null;
     content: Block[];
     track_opens: boolean;
     track_clicks: boolean;
@@ -76,7 +77,8 @@ type TemplateOption = { value: number; label: string; html: string };
 
 const props = defineProps<{
     campaign: Campaign;
-    segments: Option[];
+    lists: Option[];
+    segments: Record<number, Option[]>;
     frequencies: { value: string; label: string }[];
     templates: TemplateOption[];
     dispatches: Dispatch[];
@@ -93,6 +95,7 @@ const labelClass =
 
 const form = useForm<{
     name: string;
+    email_list_id: string;
     subject: string;
     from_name: string;
     from_email: string;
@@ -106,6 +109,9 @@ const form = useForm<{
     scheduled_at: string;
 }>({
     name: props.campaign.name,
+    email_list_id: props.campaign.email_list_id
+        ? String(props.campaign.email_list_id)
+        : 'none',
     subject: props.campaign.subject ?? '',
     from_name: props.campaign.from_name ?? '',
     from_email: props.campaign.from_email ?? '',
@@ -122,6 +128,17 @@ const form = useForm<{
     frequency: props.campaign.frequency,
     scheduled_at: props.campaign.scheduled_at ?? '',
 });
+
+const availableSegments = computed(
+    () => props.segments[Number(form.email_list_id)] ?? [],
+);
+
+watch(
+    () => form.email_list_id,
+    () => {
+        form.segment_id = 'none';
+    },
+);
 
 const formatDateTime = (value: string | null) =>
     value
@@ -158,6 +175,7 @@ const formatCount = (value: number) => numberFormatter.format(value);
 const submit = () => {
     form.transform((data) => ({
         ...data,
+        email_list_id: data.email_list_id === 'none' ? null : Number(data.email_list_id),
         segment_id: data.segment_id === 'none' ? null : data.segment_id,
         template_id: data.template_id === 'none' ? null : data.template_id,
         html: renderEmail(data.content, selectedTemplateHtml.value),
@@ -169,6 +187,33 @@ const submit = () => {
 const deleteOpen = ref(false);
 const destroy = () =>
     router.delete(destroyCampaignRoute(props.campaign.id).url);
+
+const testOpen = ref(false);
+const testEmail = ref('');
+const testSending = ref(false);
+
+const sendTest = () => {
+    if (!testEmail.value) {
+        return;
+    }
+
+    testSending.value = true;
+
+    router.post(
+        testCampaignRoute(props.campaign.id).url,
+        {
+            email: testEmail.value,
+            html: renderEmail(form.content, selectedTemplateHtml.value),
+        },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                testSending.value = false;
+                testOpen.value = false;
+            },
+        },
+    );
+};
 
 const isSent = props.campaign.stats.sent_to_count > 0;
 
@@ -199,7 +244,7 @@ const tabs = [
                 <p
                     class="text-[11px] font-semibold tracking-[0.32em] text-[hsl(var(--ds-accent-ink))] uppercase"
                 >
-                    {{ campaign.list ?? 'Campaign' }}
+                    {{ lists.find((l) => String(l.value) === form.email_list_id)?.label ?? 'Campaign' }}
                 </p>
                 <h1
                     class="font-display mt-1 truncate text-4xl leading-[1.05] tracking-tight text-[hsl(var(--ds-ink))] md:text-5xl"
@@ -207,11 +252,58 @@ const tabs = [
                     {{ campaign.name }}
                 </h1>
             </div>
-            <span
-                class="shrink-0 rounded-full border border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] px-3 py-1 text-[11px] font-semibold tracking-wide text-[hsl(var(--ds-ink-soft))] uppercase"
-            >
-                {{ statusLabel }}
-            </span>
+            <div class="flex shrink-0 items-center gap-3">
+                <span
+                    class="rounded-full border border-[hsl(var(--ds-line))] bg-[hsl(var(--ds-panel))] px-3 py-1 text-[11px] font-semibold tracking-wide text-[hsl(var(--ds-ink-soft))] uppercase"
+                >
+                    {{ statusLabel }}
+                </span>
+
+                <!-- Send test -->
+                <Dialog v-model:open="testOpen">
+                    <DialogTrigger as-child>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            class="h-9 gap-2"
+                        >
+                            <Send class="size-4" />
+                            Send test
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent class="sm:max-w-sm">
+                        <DialogHeader>
+                            <DialogTitle>Send test email</DialogTitle>
+                            <DialogDescription>
+                                Sends the current content (including unsaved changes) to the address below.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div class="grid gap-2 py-2">
+                            <Label for="test_email" :class="labelClass">Email</Label>
+                            <Input
+                                id="test_email"
+                                v-model="testEmail"
+                                type="email"
+                                placeholder="you@example.com"
+                                class="h-11"
+                                @keydown.enter.prevent="sendTest"
+                            />
+                        </div>
+                        <DialogFooter>
+                            <DialogClose as-child>
+                                <Button type="button" variant="ghost">Cancel</Button>
+                            </DialogClose>
+                            <Button
+                                type="button"
+                                :disabled="!testEmail || testSending"
+                                @click="sendTest"
+                            >
+                                {{ testSending ? 'Sending…' : 'Send' }}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
         </header>
 
         <!-- Stats (once sent) -->
@@ -304,6 +396,24 @@ const tabs = [
                         <InputError :message="form.errors.name" />
                     </div>
                     <div class="grid gap-2">
+                        <Label :class="labelClass">List <span class="text-[hsl(var(--ds-accent))]">*</span></Label>
+                        <Select v-model="form.email_list_id">
+                            <SelectTrigger class="!h-11 w-full border-[hsl(var(--ds-line))]">
+                                <SelectValue placeholder="Choose a list" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="option in lists"
+                                    :key="option.value"
+                                    :value="String(option.value)"
+                                >
+                                    {{ option.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="form.errors.email_list_id" />
+                    </div>
+                    <div class="grid gap-2">
                         <Label for="subject" :class="labelClass">Subject</Label>
                         <Input
                             id="subject"
@@ -358,7 +468,7 @@ const tabs = [
                             <SelectContent>
                                 <SelectItem value="none">Whole list</SelectItem>
                                 <SelectItem
-                                    v-for="option in segments"
+                                    v-for="option in availableSegments"
                                     :key="option.value"
                                     :value="String(option.value)"
                                 >

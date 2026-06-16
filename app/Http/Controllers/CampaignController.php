@@ -16,6 +16,7 @@ use App\Models\Template;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 use TijsVerkoyen\CssToInlineStyles\CssToInlineStyles;
@@ -115,9 +116,9 @@ class CampaignController extends Controller
                 'from_name' => $campaign->from_name,
                 'from_email' => $campaign->from_email,
                 'reply_to_email' => $campaign->reply_to_email,
+                'email_list_id' => $campaign->email_list_id,
                 'segment_id' => $campaign->segment_id,
                 'template_id' => $campaign->template_id,
-                'list' => $campaign->emailList?->name,
                 'content' => $campaign->content_json ?? [],
                 'track_opens' => $campaign->track_opens,
                 'track_clicks' => $campaign->track_clicks,
@@ -134,11 +135,12 @@ class CampaignController extends Controller
                     'unsubscribe_count' => $campaign->unsubscribe_count,
                 ],
             ],
+            'lists' => $this->listOptions(),
             'segments' => Segment::query()
-                ->where('email_list_id', $campaign->email_list_id)
                 ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (Segment $segment): array => ['value' => $segment->id, 'label' => $segment->name])
+                ->get(['id', 'name', 'email_list_id'])
+                ->groupBy('email_list_id')
+                ->map(fn ($group) => $group->map(fn (Segment $segment): array => ['value' => $segment->id, 'label' => $segment->name])->values())
                 ->all(),
             'frequencies' => array_map(
                 fn (CampaignFrequency $frequency): array => ['value' => $frequency->value, 'label' => $frequency->label()],
@@ -179,13 +181,17 @@ class CampaignController extends Controller
         $html = $data['html'] ?? null;
         $scheduledAt = ! empty($data['scheduled_at']) ? Carbon::parse($data['scheduled_at']) : null;
 
+        $listChanged = (int) ($data['email_list_id'] ?? 0) !== $campaign->email_list_id;
+
         $campaign->update([
             'name' => $data['name'],
+            'email_list_id' => $data['email_list_id'],
             'subject' => $data['subject'] ?? null,
             'from_name' => $data['from_name'] ?? null,
             'from_email' => $data['from_email'] ?? null,
             'reply_to_email' => $data['reply_to_email'] ?? null,
-            'segment_id' => $data['segment_id'] ?? null,
+            // Clear segment when list changes since segments are list-scoped.
+            'segment_id' => $listChanged ? null : ($data['segment_id'] ?? null),
             'template_id' => $data['template_id'] ?? null,
             'track_opens' => $data['track_opens'] ?? false,
             'track_clicks' => $data['track_clicks'] ?? false,
@@ -201,6 +207,42 @@ class CampaignController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Campaign saved.')]);
 
         return to_route('campaigns.edit', $campaign);
+    }
+
+    /**
+     * Send a test email for the campaign to a given address.
+     */
+    public function test(Request $request, Campaign $campaign): RedirectResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'string', 'email'],
+            'html' => ['nullable', 'string'],
+        ]);
+
+        $html = $data['html'] ?? $campaign->structured_html ?? $campaign->html ?? '';
+
+        try {
+            Mail::html($html, function ($message) use ($data, $campaign): void {
+                $message->to($data['email'])
+                    ->subject('[Test] '.($campaign->subject ?: $campaign->name));
+
+                if ($campaign->from_email) {
+                    $message->from($campaign->from_email, $campaign->from_name ?: null);
+                }
+            });
+
+            Inertia::flash('toast', [
+                'type' => 'success',
+                'message' => __('Test sent to :email.', ['email' => $data['email']]),
+            ]);
+        } catch (\Throwable $e) {
+            Inertia::flash('toast', [
+                'type' => 'error',
+                'message' => 'Mail delivery failed: '.$e->getMessage(),
+            ]);
+        }
+
+        return back();
     }
 
     /**

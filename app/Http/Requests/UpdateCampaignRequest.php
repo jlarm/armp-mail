@@ -20,10 +20,12 @@ class UpdateCampaignRequest extends FormRequest
     public function rules(): array
     {
         $campaign = $this->route('campaign');
-        $listId = $campaign instanceof Campaign ? $campaign->email_list_id : null;
+        $listId = (int) ($this->input('email_list_id')
+            ?: ($campaign instanceof Campaign ? $campaign->email_list_id : null));
 
         return [
             'name' => ['required', 'string', 'max:255'],
+            'email_list_id' => ['required', 'integer', Rule::exists('email_lists', 'id')],
             'subject' => ['nullable', 'string', 'max:255'],
             'from_name' => ['nullable', 'string', 'max:255'],
             'from_email' => ['nullable', 'string', 'email', 'max:255'],

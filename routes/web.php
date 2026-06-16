@@ -21,6 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::resource('campaigns', CampaignController::class)->except(['show']);
+    Route::post('campaigns/{campaign}/test', [CampaignController::class, 'test'])->name('campaigns.test');
 
     Route::post('templates/images', [TemplateController::class, 'uploadImage'])->name('templates.images');
     Route::resource('templates', TemplateController::class)->except(['show']);

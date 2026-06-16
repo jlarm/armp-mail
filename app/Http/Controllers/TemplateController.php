@@ -174,14 +174,21 @@ class TemplateController extends Controller
 
         $html = $this->inlineCss($this->fillSampleData($template->html));
 
-        Mail::html($html, function ($message) use ($data, $template): void {
-            $message->to($data['email'])->subject("[Test] {$template->name}");
-        });
+        try {
+            Mail::html($html, function ($message) use ($data, $template): void {
+                $message->to($data['email'])->subject("[Test] {$template->name}");
+            });
 
-        Inertia::flash('toast', [
-            'type' => 'success',
-            'message' => __('Test sent to :email.', ['email' => $data['email']]),
-        ]);
+            Inertia::flash('toast', [
+                'type' => 'success',
+                'message' => __('Test sent to :email.', ['email' => $data['email']]),
+            ]);
+        } catch (\Throwable $e) {
+            Inertia::flash('toast', [
+                'type' => 'error',
+                'message' => 'Mail delivery failed: '.$e->getMessage(),
+            ]);
+        }
 
         return back();
     }
