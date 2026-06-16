@@ -92,6 +92,17 @@ class EvaluateSegments
     }
 
     /**
+     * Precompute the set-based lookups needed to evaluate a single segment.
+     * Returns an $sets array ready to pass to matches().
+     *
+     * @return array<string, array<int, true>>
+     */
+    public function prepareSets(Segment $segment): array
+    {
+        return $this->precomputeSets(collect([$segment]));
+    }
+
+    /**
      * Whether a subscriber satisfies a segment's conditions.
      *
      * @param  array<string, array<int, true>>  $sets

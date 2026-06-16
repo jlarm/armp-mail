@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Send, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Send, SendHorizonal, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import BlockEditor from '@/components/BlockEditor.vue';
 import InputError from '@/components/InputError.vue';
@@ -30,6 +30,7 @@ import type { Block } from '@/lib/renderBlocks';
 import {
     destroy as destroyCampaignRoute,
     index as campaignsRoute,
+    sendNow as sendNowRoute,
     test as testCampaignRoute,
     update as updateCampaignRoute,
 } from '@/routes/campaigns';
@@ -187,6 +188,23 @@ const submit = () => {
 const deleteOpen = ref(false);
 const destroy = () =>
     router.delete(destroyCampaignRoute(props.campaign.id).url);
+
+const sendNowOpen = ref(false);
+const sendNowLoading = ref(false);
+
+const confirmSendNow = () => {
+    sendNowLoading.value = true;
+    router.post(
+        sendNowRoute(props.campaign.id).url,
+        {},
+        {
+            onFinish: () => {
+                sendNowLoading.value = false;
+                sendNowOpen.value = false;
+            },
+        },
+    );
+};
 
 const testOpen = ref(false);
 const testEmail = ref('');
@@ -596,6 +614,41 @@ const tabs = [
                             <Checkbox v-model="form.track_clicks" />
                             Track clicks
                         </label>
+                    </div>
+
+                    <!-- Send now -->
+                    <div v-if="campaign.editable">
+                        <Dialog v-model:open="sendNowOpen">
+                            <DialogTrigger as-child>
+                                <Button
+                                    type="button"
+                                    class="gap-2"
+                                >
+                                    <SendHorizonal class="size-4" />
+                                    Send now
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent class="sm:max-w-sm">
+                                <DialogHeader>
+                                    <DialogTitle>Send campaign now?</DialogTitle>
+                                    <DialogDescription>
+                                        This will immediately queue delivery to all subscribers on the selected list. This cannot be undone.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                    <DialogClose as-child>
+                                        <Button type="button" variant="ghost">Cancel</Button>
+                                    </DialogClose>
+                                    <Button
+                                        type="button"
+                                        :disabled="sendNowLoading"
+                                        @click="confirmSendNow"
+                                    >
+                                        {{ sendNowLoading ? 'Sending…' : 'Send now' }}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
 
                     <!-- Send history -->

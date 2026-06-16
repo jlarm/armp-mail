@@ -7,6 +7,7 @@ use App\Http\Controllers\ListsController;
 use App\Http\Controllers\ListSegmentController;
 use App\Http\Controllers\ListSubscriberController;
 use App\Http\Controllers\ListTagController;
+use App\Http\Controllers\MailgunWebhookController;
 use App\Http\Controllers\TemplateController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,11 +18,15 @@ Route::get('e/o/{send:uuid}', [CampaignTrackingController::class, 'open'])->name
 Route::get('e/c/{send:uuid}', [CampaignTrackingController::class, 'click'])->name('campaigns.track.click');
 Route::get('e/u/{send:uuid}', [CampaignTrackingController::class, 'unsubscribe'])->name('campaigns.track.unsubscribe');
 
+// Mailgun webhook — signature verified inside the controller.
+Route::post('webhooks/mailgun', [MailgunWebhookController::class, 'handle'])->name('webhooks.mailgun');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::resource('campaigns', CampaignController::class)->except(['show']);
     Route::post('campaigns/{campaign}/test', [CampaignController::class, 'test'])->name('campaigns.test');
+    Route::post('campaigns/{campaign}/send-now', [CampaignController::class, 'sendNow'])->name('campaigns.send-now');
 
     Route::post('templates/images', [TemplateController::class, 'uploadImage'])->name('templates.images');
     Route::resource('templates', TemplateController::class)->except(['show']);

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Actions\EvaluateSegments;
 use App\Enums\Status;
 use App\Models\CampaignDispatch;
+use App\Models\Segment;
 use App\Models\Send;
 use App\Models\Subscriber;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,7 +22,7 @@ class SendCampaignDispatch implements ShouldQueue
 
     public function __construct(public CampaignDispatch $dispatch) {}
 
-    public function handle(): void
+    public function handle(EvaluateSegments $evaluator): void
     {
         $campaign = $this->dispatch->campaign;
 
@@ -31,11 +33,21 @@ class SendCampaignDispatch implements ShouldQueue
         $baseHtml = $campaign->structured_html ?: ($campaign->html ?? '');
         $sent = 0;
 
+        $segment = $campaign->segment_id
+            ? Segment::find($campaign->segment_id)
+            : null;
+
+        $sets = $segment ? $evaluator->prepareSets($segment) : [];
+
         $campaign->emailList
             ->subscribers()
             ->wherePivot('status', Status::SUBSCRIBED->value)
             ->lazyById()
-            ->each(function (Subscriber $subscriber) use ($campaign, $baseHtml, &$sent): void {
+            ->each(function (Subscriber $subscriber) use ($campaign, $baseHtml, $segment, $sets, $evaluator, &$sent): void {
+                if ($segment && ! $evaluator->matches($segment, $subscriber, $sets)) {
+                    return;
+                }
+
                 $send = new Send;
                 $send->uuid = (string) Str::ulid();
                 $send->subscriber_id = $subscriber->id;
@@ -50,7 +62,7 @@ class SendCampaignDispatch implements ShouldQueue
                     (bool) $campaign->track_clicks,
                 );
 
-                Mail::html($html, function (Message $message) use ($campaign, $subscriber): void {
+                Mail::html($html, function (Message $message) use ($campaign, $subscriber, $send): void {
                     $message->to($subscriber->email)
                         ->subject($campaign->subject ?: $campaign->name);
 
@@ -61,6 +73,13 @@ class SendCampaignDispatch implements ShouldQueue
                     if ($campaign->reply_to_email) {
                         $message->replyTo($campaign->reply_to_email);
                     }
+
+                    // Embed the Send UUID so Mailgun webhook events can look
+                    // up this exact delivery record.
+                    $message->getSymfonyMessage()->getHeaders()->addTextHeader(
+                        'X-Mailgun-Variables',
+                        (string) json_encode(['send_uuid' => $send->uuid]),
+                    );
                 });
 
                 $sent++;

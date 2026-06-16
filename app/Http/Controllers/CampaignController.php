@@ -8,6 +8,7 @@ use App\Enums\CampaignFrequency;
 use App\Enums\CampaignStatus;
 use App\Http\Requests\StoreCampaignRequest;
 use App\Http\Requests\UpdateCampaignRequest;
+use App\Jobs\SendCampaignDispatch;
 use App\Models\Campaign;
 use App\Models\CampaignDispatch;
 use App\Models\EmailList;
@@ -243,6 +244,34 @@ class CampaignController extends Controller
         }
 
         return back();
+    }
+
+    /**
+     * Immediately dispatch a campaign to its list.
+     */
+    public function sendNow(Campaign $campaign): RedirectResponse
+    {
+        abort_unless(in_array($campaign->status, self::EDITABLE, true), 403);
+        abort_if($campaign->email_list_id === null, 422, 'Campaign has no list.');
+
+        $dispatch = $campaign->dispatches()->create([
+            'status' => 'pending',
+            'scheduled_at' => now(),
+        ]);
+
+        SendCampaignDispatch::dispatch($dispatch);
+
+        $campaign->update([
+            'status' => CampaignStatus::SENDING->value,
+            'last_sent_at' => now(),
+            'next_run_at' => $campaign->frequency !== CampaignFrequency::ONCE
+                ? $campaign->frequency->nextRunAfter(now())
+                : null,
+        ]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Campaign queued for delivery.')]);
+
+        return to_route('campaigns.edit', $campaign);
     }
 
     /**
